@@ -4,6 +4,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 import gym  # noqaL 402
+from gridworld import CliffWalkingWapper  # noqaL 402
 from qlearning import QLearningAgent  # noqaL 402
 from sarsa import SarsaAgent  # noqaL 402
 
@@ -80,6 +81,7 @@ def evaluate(env, agent):
 
 def train_evaluate(is_qlearning, num):
     env = gym.make("CliffWalking-v0")
+    env = CliffWalkingWapper(env)
     obs_dim = env.observation_space.n
     act_dim = env.action_space.n
 
