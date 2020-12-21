@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
@@ -72,6 +73,7 @@ def evaluate(env, agent):
         total_reward += reward
 
         env.render()
+        time.sleep(1.0 / 60)
 
         if done:
             break
@@ -107,6 +109,8 @@ def train_evaluate(is_qlearning, num):
     print(f"evaluate {name}")
     total_step, total_reward = evaluate(env, agent)
     print(f"evaluate result. total step: {total_step}, total reward: {total_reward}")
+
+    env.close()
 
 
 def main():
