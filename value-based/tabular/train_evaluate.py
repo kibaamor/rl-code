@@ -1,8 +1,4 @@
-import os
-import sys
 import time
-
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 import gym  # noqaL 402
 from gridworld import CliffWalkingWapper  # noqaL 402
