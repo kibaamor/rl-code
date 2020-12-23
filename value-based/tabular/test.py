@@ -1,16 +1,17 @@
 import time
 
-import gym  # noqaL 402
-from gridworld import CliffWalkingWapper  # noqaL 402
-from qlearning import QLearningAgent  # noqaL 402
-from sarsa import SarsaAgent  # noqaL 402
+import gym
+from qlearning import QLearningAgent
+from sarsa import SarsaAgent
+from utils.gridworld import CliffWalkingWapper
 
 
 def train_qlearning(env, agent):
-    total_step = 0
-    total_reward = 0
+    agent.update_egreed()
 
     obs = env.reset()
+    total_step = 0
+    total_reward = 0
 
     while True:
         act = agent.sample(obs)
@@ -19,7 +20,6 @@ def train_qlearning(env, agent):
         agent.learn(obs, act, reward, next_obs, done)
 
         obs = next_obs
-
         total_step += 1
         total_reward += reward
 
@@ -30,10 +30,12 @@ def train_qlearning(env, agent):
 
 
 def train_sarsa(env, agent):
+    agent.update_egreed()
+
     total_step = 0
     total_reward = 0
-
     obs = env.reset()
+
     act = agent.sample(obs)
 
     while True:

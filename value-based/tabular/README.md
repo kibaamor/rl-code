@@ -10,16 +10,16 @@ pip3 install numpy gym
 
 ### 1.Sarsa
 
-[sarsa.py](value-based/tabular/sarsa.py)
+[sarsa.py](sarsa.py)
 
-![Sarsa](sarsa.gif)
+![Sarsa](img/sarsa.gif)
 
 ### 2.Q-Learning
 
-[qlearning.py](value-based/tabular/qlearning.py)
+[qlearning.py](qlearning.py)
 
-![QLearning](qlearning.gif)
+![QLearning](img/qlearning.gif)
 
 ## Test
 
-[train_evaluate.py](value-based/tabular/train_evaluate.py)
+[test.py](test.py)
