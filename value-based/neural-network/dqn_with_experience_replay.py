@@ -6,19 +6,27 @@ from gym.spaces import Discrete, Space
 from torch import nn
 from torch.nn.functional import mse_loss
 from utils.agent import Agent
+from utils.experience_replay import ExperienceReplay, Transition
 from utils.flappybird_wrapper import FlappyBirdWrapper
 
 
-class RawDQNAgent(Agent):
+class DQNWithExperienceReplayAgent(Agent):
     def __init__(
         self,
         obs_space: Space,
         act_space: Discrete,
+        memory_capacity,
+        batch_size,
+        step_per_learn,
         writer_name: str,
         *args,
         **kwargs,
     ):
         super().__init__(writer_name, *args, **kwargs)
+        self.exp_replay = ExperienceReplay(memory_capacity, batch_size)
+        self.step_per_learn = step_per_learn
+
+        self.learn_count = 0
 
         # input (, 80, 80)
         self.network = nn.Sequential(
@@ -59,15 +67,23 @@ class RawDQNAgent(Agent):
         next_obs: np.ndarray,
         done: bool,
     ) -> Optional[float]:
-        obs = torch.from_numpy(obs).to(self.device)
-        obs.unsqueeze_(0)
-        next_obs = torch.from_numpy(next_obs).to(self.device)
-        next_obs.unsqueeze_(0)
+        trans = Transition(obs, act, reward, next_obs, done)
+        self.exp_replay.add(trans)
 
-        qvalue_predict = self.network(obs)[0][act]
+        self.learn_count += 1
+        if self.learn_count >= self.step_per_learn:
+            self.learn_count -= self.step_per_learn
+            return self._do_learn(episode)
 
-        qvalue_max = self._predict_qvalue(next_obs, 0)[0].max()
-        qvalue_target = reward + (1 - np.int(done)) * self.gamma * qvalue_max
+    def _do_learn(self, episode: int) -> Optional[float]:
+        if not self.exp_replay.can_sample():
+            return
+        batch = self.exp_replay.sample(self.device)
+
+        qvalue_predict = self.network(batch.obs).gather(1, batch.act).squeeze()
+
+        qvalue_max = self._predict_qvalue(batch.next_obs, 0).max(-1)[0]
+        qvalue_target = batch.reward + (1 - batch.done) * self.gamma * qvalue_max
 
         loss = mse_loss(qvalue_predict, qvalue_target)
         self.optimizer.zero_grad()
@@ -80,9 +96,17 @@ class RawDQNAgent(Agent):
 def main():
     train_env = FlappyBirdWrapper()
     test_env = FlappyBirdWrapper(display_screen=True)
-    writer_name = "raw_dqn"
-    agent = RawDQNAgent(
-        train_env.observation_space, train_env.action_space, writer_name
+    memory_capacity = 100000
+    batch_size = 128
+    step_per_learn = 128
+    writer_name = "dqn_with_experience_replay"
+    agent = DQNWithExperienceReplayAgent(
+        train_env.observation_space,
+        train_env.action_space,
+        memory_capacity,
+        batch_size,
+        step_per_learn,
+        writer_name,
     )
 
     agent.train_test(train_env, test_env)

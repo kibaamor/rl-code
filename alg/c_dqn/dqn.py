@@ -2,25 +2,27 @@
 # coding=utf-8
 import os
 import random
+from collections import deque, namedtuple
+
+import gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import numpy as np
-from collections import namedtuple, deque
 from tensorboardX import SummaryWriter
-import gym
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'reward', 'next_state', 'done'))
+Transition = namedtuple(
+    "Transition", ("state", "action", "reward", "next_state", "done")
+)
 
 script_path = os.path.split(os.path.realpath(__file__))[0]
 
 # Use Double-Q Learning ?
 USE_DBQN = False
 
-pt_file = os.path.join(script_path, 'dbqn.pt' if USE_DBQN else 'dqn.pt')
-env = gym.make('MountainCar-v0')
+pt_file = os.path.join(script_path, "dbqn.pt" if USE_DBQN else "dqn.pt")
+env = gym.make("MountainCar-v0")
 
 OBS_N = env.observation_space.shape[0]
 ACT_N = env.action_space.n
@@ -70,8 +72,9 @@ class Agent:
         self.target_model.load_state_dict(self.model.state_dict())
 
         self.memory = deque(maxlen=MEMORY_CAPACITY)
-        self.optimizer = optim.Adam(self.model.parameters(
-        ), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        self.optimizer = optim.Adam(
+            self.model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+        )
         self.loss_func = nn.MSELoss()
 
         self.e_greed = E_GREED
@@ -122,19 +125,19 @@ class Agent:
         loss.backward()
         self.optimizer.step()
 
-        writer.add_scalar('train/value_loss', loss.item(), self.update_count)
+        writer.add_scalar("train/value_loss", loss.item(), self.update_count)
         self.update_count += 1
         if self.update_count % MODEL_SYNC_COUNT == 0:
             self.target_model.load_state_dict(self.model.state_dict())
 
     def save(self):
         torch.save(self.model.state_dict(), pt_file)
-        print(pt_file + ' saved.')
+        print(pt_file + " saved.")
 
     def load(self):
         self.model.load_state_dict(torch.load(pt_file))
         self.target_model.load_state_dict(self.model.state_dict())
-        print(pt_file + ' loaded.')
+        print(pt_file + " loaded.")
 
 
 def train(writer, agent, episode):
@@ -154,9 +157,8 @@ def train(writer, agent, episode):
         obs = next_obs
         total_reward += reward
         if done or t >= 9999:
-            writer.add_scalar('train/finish_step', t + 1, global_step=episode)
-            writer.add_scalar('train/total_reward',
-                              total_reward, global_step=episode)
+            writer.add_scalar("train/finish_step", t + 1, episode)
+            writer.add_scalar("train/total_reward", total_reward, episode)
             break
 
 
@@ -169,10 +171,8 @@ def evaluate(writer, agent, episode):
         total_reward += reward
 
         if done:
-            writer.add_scalar('evaluate/finish_step',
-                              t + 1, global_step=episode)
-            writer.add_scalar('evaluate/total_reward',
-                              total_reward, global_step=episode)
+            writer.add_scalar("evaluate/finish_step", t + 1, episode)
+            writer.add_scalar("evaluate/total_reward", total_reward, episode)
             break
 
 
@@ -182,10 +182,9 @@ def main():
     if os.path.exists(pt_file):
         agent.load()
 
-    writer = SummaryWriter(os.path.join(
-        script_path, 'DBQN' if USE_DBQN else 'DQN'))
+    writer = SummaryWriter(os.path.join(script_path, "DBQN" if USE_DBQN else "DQN"))
     for episode in range(EPISODES_NUM):
-        print(f'episode: {episode}')
+        print(f"episode: {episode}")
         train(writer, agent, episode)
         if episode % 10 == 9:
             evaluate(writer, agent, episode)
@@ -193,5 +192,5 @@ def main():
             agent.save()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

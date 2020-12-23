@@ -1,8 +1,10 @@
 #!/usr/bin/python
 # coding=utf-8
+from typing import Tuple
+
 import cv2
 import numpy as np
-from gym import spaces
+from gym import Env, spaces
 from ple import PLE
 from ple.games import FlappyBird
 
@@ -19,7 +21,7 @@ def preprocess(obs):
     return obs
 
 
-class FlappyBirdWrapper:
+class FlappyBirdWrapper(Env):
     def __init__(self, **kwargs):
         self.game = FlappyBird()
         self.p = PLE(self.game, **kwargs)
@@ -32,18 +34,18 @@ class FlappyBirdWrapper:
         empty_frame = np.zeros(FRAME_SIZE, dtype=np.float32)
         self.obs = np.stack((empty_frame,) * STACK, axis=0)
 
-    def _get_obs(self):
+    def _get_obs(self) -> np.ndarray:
         obs = self.p.getScreenRGB()
         obs = preprocess(obs)
         self.obs = np.concatenate((self.obs[1:, :, :], obs), axis=0)
         return self.obs
 
-    def reset(self):
-        self.p.reset_game()
-        return self._get_obs()
-
-    def step(self, action):
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, None]:
         reward = self.p.act(self.action_set[action])
         obs = self._get_obs()
         done = self.p.game_over()
-        return obs, reward, done, {}
+        return obs, reward, done, None
+
+    def reset(self) -> np.ndarray:
+        self.p.reset_game()
+        return self._get_obs()
