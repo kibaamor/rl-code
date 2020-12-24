@@ -1,0 +1,11 @@
+numpy
+gym
+torch
+tensorboard
+Pillow
+pygame
+-e git+https://github.com/ntasfi/PyGame-Learning-Environment.git
+# dev
+black
+flake8
+pre-commit

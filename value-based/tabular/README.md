@@ -3,7 +3,7 @@
 ## Envirnments
 
 ```bash
-pip3 install numpy gym
+pip install -r requirements.txt
 ```
 
 ## Code

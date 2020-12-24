@@ -1,3 +1,4 @@
+import os
 import pathlib
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -20,6 +21,9 @@ def save_ckpt(model: Module, filename: str) -> bool:
 
     return True if success else False
     """
+
+    if not path.isdir(SAVED_MODEL_DIR):
+        os.mkdir(SAVED_MODEL_DIR)
 
     fullpath = path.join(SAVED_MODEL_DIR, filename)
 
@@ -49,6 +53,9 @@ def load_ckpt(model: Module, filename: str) -> bool:
 def create_summary_writer(name: str) -> SummaryWriter:
     """Create a tensorboard writer"""
 
+    if not path.isdir(SUMMARY_BASE_DIR):
+        os.mkdir(SUMMARY_BASE_DIR)
+
     log_dir = path.join(SUMMARY_BASE_DIR, name)
     return SummaryWriter(log_dir=log_dir)
 
@@ -62,10 +69,10 @@ class Agent(ABC):
         lr: float = 1e-4,
         gamma: float = 0.98,
         eps_train: float = 0.9,
-        eps_test: float = 0.01,
+        eps_test: float = 0.001,
         eps_min: float = 0.01,
         eps_decay_per_update: float = 0.99,
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        device: torch.device = None,
     ):
         self.ckpt_filename = (
             ckpt_filename if ckpt_filename is not None else writer_name + ".pth"
@@ -78,6 +85,8 @@ class Agent(ABC):
         self.eps_min = eps_min
         self.eps_decay_per_update = eps_decay_per_update
         self.device = device
+        if self.device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.eps = self.eps_train
         self.writer = create_summary_writer(writer_name)
@@ -124,7 +133,7 @@ class Agent(ABC):
             loss = self.learn(episode, obs, act, reward, next_obs, done)
             if loss is not None:
                 self.writer.add_scalar("train/loss", loss, self._train_step_count)
-                self._train_step_count += 1
+            self._train_step_count += 1
 
             total_reward += reward
             obs = next_obs
