@@ -2,6 +2,23 @@
 
 [Understand the basic concepts in reinforcement learning](https://kibazen.cn/li-jie-qiang-hua-xue-xi-zhong-de-ji-ben-gai-nian/)
 
+## HowToRun
+
+1. install requirements
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+2. run code
+    ```bash
+    cd value-based/tabular
+
+    # test sarsa code
+    python -m sarsa
+    # if running in terminal without display, use blow command
+    xvfb-run -a -s "-screen 0 1400x900x24" python -m raw_dqn
+    ```
+
 ## 1. [Value Based Learning](https://kibazen.cn/qiang-hua-xue-xi-zhong-shi-xu-chai-fen-xue-xi/)
 
 ### 1.1 [Tabular Based](value-based/tabular/README.md)
