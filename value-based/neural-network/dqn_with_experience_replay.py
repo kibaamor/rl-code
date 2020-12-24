@@ -3,12 +3,12 @@ from typing import Optional
 import numpy as np
 import torch
 from torch.nn.functional import mse_loss
-from utils.agent import Agent
 from utils.experience_replay import ExperienceReplay, Transition
 from utils.flappybird_wrapper import FlappyBirdWrapper, create_network
+from utils.nnq_agent import NNQAgent
 
 
-class DQNWithExperienceReplayAgent(Agent):
+class DQNWithExperienceReplayAgent(NNQAgent):
     def __init__(
         self,
         memory_capacity,
@@ -64,16 +64,31 @@ class DQNWithExperienceReplayAgent(Agent):
 
 def main():
     name = "dqn_with_experience_replay"
-    train_env = FlappyBirdWrapper(caption=name)
-    test_env = FlappyBirdWrapper(caption=name, display_screen=True)
-    memory_capacity = 100000
+    memory_capacity = 50000
     batch_size = 128
     step_per_learn = 128
+
     agent = DQNWithExperienceReplayAgent(
         memory_capacity, batch_size, step_per_learn, name
     )
 
-    agent.train_test(train_env, test_env)
+    train_env = FlappyBirdWrapper(caption=name)
+    test_env = FlappyBirdWrapper(caption=name, display_screen=True)
+    load_cpkt = True
+    total_episode = 100000
+    max_step_per_episode = 1000
+    episode_per_test = 10
+    episode_per_save = 10
+
+    agent.train_test(
+        train_env,
+        test_env,
+        load_cpkt,
+        total_episode,
+        max_step_per_episode,
+        episode_per_test,
+        episode_per_save,
+    )
 
 
 if __name__ == "__main__":

@@ -3,11 +3,11 @@ from typing import Optional
 import numpy as np
 import torch
 from torch.nn.functional import mse_loss
-from utils.agent import Agent
 from utils.flappybird_wrapper import FlappyBirdWrapper, create_network
+from utils.nnq_agent import NNQAgent
 
 
-class RawDQNAgent(Agent):
+class RawDQNAgent(NNQAgent):
     def __init__(
         self,
         writer_name: str,
@@ -48,11 +48,26 @@ class RawDQNAgent(Agent):
 
 def main():
     name = "raw_dqn"
-    train_env = FlappyBirdWrapper(caption=name)
-    test_env = FlappyBirdWrapper(caption=name, display_screen=True)
+
     agent = RawDQNAgent(name)
 
-    agent.train_test(train_env, test_env)
+    train_env = FlappyBirdWrapper(caption=name)
+    test_env = FlappyBirdWrapper(caption=name, display_screen=True)
+    load_cpkt = True
+    total_episode = 100000
+    max_step_per_episode = 1000
+    episode_per_test = 10
+    episode_per_save = 10
+
+    agent.train_test(
+        train_env,
+        test_env,
+        load_cpkt,
+        total_episode,
+        max_step_per_episode,
+        episode_per_test,
+        episode_per_save,
+    )
 
 
 if __name__ == "__main__":

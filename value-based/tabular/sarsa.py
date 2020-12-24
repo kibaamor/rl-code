@@ -1,38 +1,66 @@
 #!/usr/bin/python3
 # coding=utf-8
+import gym
 import numpy as np
-
-LEARNING_RATE = 0.1
-GAMMA = 0.98
-E_GREED_INIT = 0.9
-E_GREED_DECAY = 0.99
-E_GREED_MIN = 0.01
+from gym import Env
+from utils.gridworld import CliffWalkingWapper
+from utils.tabq_agent import TabQAgent
 
 
-class SarsaAgent:
-    def __init__(self, obs_dim, act_dim):
-        self.Q_pi = np.zeros((obs_dim, act_dim))
-        self.act_dim = act_dim
-        self.e_greed = E_GREED_INIT
+class SarsaAgent(TabQAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def update_egreed(self):
-        self.e_greed = max(E_GREED_MIN, self.e_greed * E_GREED_DECAY)
-        return self.e_greed
+    def train(self, env: Env, max_step: int) -> None:
+        total_step = 0
+        total_reward = 0
+        obs = env.reset()
+        act = self(obs, True)
 
-    def predict(self, obs):
-        q_list = self.Q_pi[obs, :]
-        q_max = np.max(q_list)
-        choice_list = np.where(q_list == q_max)[0]
-        return np.random.choice(choice_list)
+        while True:
+            next_obs, reward, done, _ = env.step(act)
+            next_act = self(next_obs, True)
 
-    def sample(self, obs):
-        if np.random.rand() < self.e_greed:
-            return np.random.choice(self.act_dim)
-        else:
-            return self.predict(obs)
+            self.learn(obs, act, reward, next_obs, next_act, done)
 
-    def learn(self, obs, act, reward, next_obs, next_act, done):
-        predict = self.Q_pi[obs, act]
-        td_target = reward + (1 - np.int(done)) * GAMMA * self.Q_pi[next_obs, next_act]
-        td_error = predict - td_target
-        self.Q_pi[obs, act] -= LEARNING_RATE * td_error
+            obs = next_obs
+            act = next_act
+            total_step += 1
+            total_reward += reward
+            if done:
+                break
+
+        print(f"train total_step: {total_step}, total_reward: {total_reward}")
+
+    def learn(
+        self,
+        obs: int,
+        act: int,
+        reward: float,
+        next_obs: int,
+        next_act: int,
+        done: bool,
+    ) -> None:
+        qvalue_predict = self.Q[obs, act]
+
+        qvalue_target = (
+            reward + (1 - np.int(done)) * self.gamma * self.Q[next_obs, next_act]
+        )
+        td_error = qvalue_predict - qvalue_target
+        self.Q[obs, act] -= self.lr * td_error
+
+
+def main():
+    env = gym.make("CliffWalking-v0")
+    env = CliffWalkingWapper(env)
+    obs_n = env.observation_space.n
+    act_n = env.action_space.n
+    agent = SarsaAgent(obs_n, act_n)
+
+    total_episode = 1000
+    max_step_per_episode = 100
+    agent.train_test(env, total_episode, max_step_per_episode)
+
+
+if __name__ == "__main__":
+    main()

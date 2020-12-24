@@ -1,25 +1,13 @@
-# Value Based Learning(Tabular Version)
+# Value Based Learning(Tabular Based)
 
-## Envirnments
-
-```bash
-pip install -r requirements.txt
-```
-
-## Code
-
-### 1.Sarsa
+## 1.Sarsa
 
 [sarsa.py](sarsa.py)
 
 ![Sarsa](img/sarsa.gif)
 
-### 2.Q-Learning
+## 2.Q-Learning
 
 [qlearning.py](qlearning.py)
 
 ![QLearning](img/qlearning.gif)
-
-## Test
-
-[test.py](test.py)

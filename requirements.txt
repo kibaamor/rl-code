@@ -4,7 +4,7 @@ torch
 tensorboard
 Pillow
 pygame
--e git+https://github.com/ntasfi/PyGame-Learning-Environment.git
+-e git+https://github.com/ntasfi/PyGame-Learning-Environment.git@3dbe79dc0c35559bb441b9359948aabf9bb3d331#egg=ple
 # dev
 black
 flake8

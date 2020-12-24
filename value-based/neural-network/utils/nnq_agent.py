@@ -60,7 +60,9 @@ def create_summary_writer(name: str) -> SummaryWriter:
     return SummaryWriter(log_dir=log_dir)
 
 
-class Agent(ABC):
+class NNQAgent(ABC):
+    """Neural network based Q Learning agent"""
+
     def __init__(
         self,
         writer_name: str,
@@ -119,14 +121,18 @@ class Agent(ABC):
         return act
 
     def train(
-        self, episode: int, total_episode: int, env: Env, max_step_per_episode: int
+        self,
+        episode: int,
+        total_episode: int,
+        env: Env,
+        max_step: int,
     ) -> None:
         eps = self.update_eps(episode, total_episode)
 
         total_reward = 0
         obs = env.reset()
 
-        for step in range(1, max_step_per_episode):
+        for step in range(1, max_step):
             act = self.get_act(obs, True)
             next_obs, reward, done, _ = env.step(act)
 
@@ -144,11 +150,11 @@ class Agent(ABC):
         self.writer.add_scalar("train/step", step, episode)
         self.writer.add_scalar("train/reward", total_reward, episode)
 
-    def test(self, episode: int, env: Env, max_step_per_episode: int) -> None:
+    def test(self, episode: int, env: Env, max_step: int) -> None:
         total_reward = 0
         obs = env.reset()
 
-        for step in range(1, max_step_per_episode):
+        for step in range(1, max_step):
             act = self.get_act(obs, False)
             obs, reward, done, _ = env.step(act)
 
@@ -164,11 +170,11 @@ class Agent(ABC):
         self,
         train_env: Env,
         test_env: Env,
-        load_cpkt=True,
-        total_episode=100000,
-        max_step_per_episode=1000,
-        episode_per_test=10,
-        episode_per_save=10,
+        load_cpkt: bool,
+        total_episode: int,
+        max_step_per_episode: int,
+        episode_per_test: int,
+        episode_per_save: int,
     ):
         if load_ckpt:
             self.load()
