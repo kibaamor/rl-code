@@ -3,8 +3,9 @@ gym
 torch
 tensorboard
 Pillow
+opencv-python
 pygame
--e git+https://github.com/ntasfi/PyGame-Learning-Environment.git@3dbe79dc0c35559bb441b9359948aabf9bb3d331#egg=ple
+-e git+https://github.com/SamWqc/PyGame-Learning-Environment.git@832cc2d57d12f998464370b2b107ba93ab4d2ffe#egg=ple
 # dev
 black
 flake8
