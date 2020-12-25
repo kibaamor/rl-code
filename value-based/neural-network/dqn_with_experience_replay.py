@@ -14,11 +14,11 @@ class DQNWithExperienceReplayAgent(NNQAgent):
         memory_capacity,
         batch_size,
         step_per_learn,
-        writer_name: str,
+        name: str,
         *args,
         **kwargs,
     ):
-        super().__init__(writer_name, *args, **kwargs)
+        super().__init__(name, *args, **kwargs)
         self.exp_replay = ExperienceReplay(memory_capacity, batch_size)
         self.step_per_learn = step_per_learn
 
@@ -73,26 +73,12 @@ def main():
         memory_capacity, batch_size, step_per_learn, name
     )
 
-    # eval_env = FlappyBirdWrapper(caption=name, display_screen=True, force_fps=False)
-    # agent.evaluate(10, eval_env, 1000, True)
-
     train_env = FlappyBirdWrapper(caption=name)
-    test_env = FlappyBirdWrapper(caption=name, display_screen=True, force_fps=True)
-    load_cpkt = True
-    total_episode = 100000
-    max_step_per_episode = 1000
-    episode_per_test = 10
-    episode_per_save = 10
+    test_env = train_env
+    eval_env = FlappyBirdWrapper(caption=name, display_screen=True, force_fps=False)
+    total_train_episode = 100000
 
-    agent.train_test(
-        train_env,
-        test_env,
-        load_cpkt,
-        total_episode,
-        max_step_per_episode,
-        episode_per_test,
-        episode_per_save,
-    )
+    agent.train_test_eval(train_env, test_env, eval_env, total_train_episode)
 
 
 if __name__ == "__main__":

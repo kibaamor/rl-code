@@ -2,6 +2,7 @@ import os
 import pathlib
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from datetime import datetime
 from os import path
 from typing import Optional
 
@@ -65,7 +66,8 @@ class NNQAgent(ABC):
 
     def __init__(
         self,
-        writer_name: str,
+        name: str,
+        name_append_time=True,
         ckpt_filename: str = None,
         network_name="network",
         lr: float = 1e-4,
@@ -76,8 +78,11 @@ class NNQAgent(ABC):
         eps_decay_per_update: float = 0.99,
         device: torch.device = None,
     ):
+        if name_append_time:
+            name += datetime.now().strftime("_%Y%m%d_%H%M%S")
+
         self.ckpt_filename = (
-            ckpt_filename if ckpt_filename is not None else writer_name + ".pth"
+            ckpt_filename if ckpt_filename is not None else name + ".pth"
         )
         self.network_name = network_name
         self.lr = lr
@@ -91,7 +96,7 @@ class NNQAgent(ABC):
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.eps = self.eps_train
-        self.writer = create_summary_writer(writer_name)
+        self.writer = create_summary_writer(name)
         self._train_step_count = 0
 
     def update_eps(self, episode: int, total_episode: int) -> float:
@@ -112,7 +117,7 @@ class NNQAgent(ABC):
             return load_ckpt(network, self.ckpt_filename)
         return False
 
-    def get_act(self, obs: np.ndarray, is_train: bool) -> int:
+    def __call__(self, obs: np.ndarray, is_train: bool) -> int:
         eps = self.eps if is_train else self.eps_test
 
         obs = torch.from_numpy(obs).to(self.device)
@@ -134,7 +139,7 @@ class NNQAgent(ABC):
         obs = env.reset()
 
         for step in range(1, max_step):
-            act = self.get_act(obs, True)
+            act = self(obs, True)
             next_obs, reward, done, _ = env.step(act)
 
             loss = self.learn(episode, obs, act, reward, next_obs, done)
@@ -156,7 +161,7 @@ class NNQAgent(ABC):
         obs = env.reset()
 
         for step in range(1, max_step):
-            act = self.get_act(obs, False)
+            act = self(obs, False)
             obs, reward, done, _ = env.step(act)
 
             total_reward += reward
@@ -167,47 +172,83 @@ class NNQAgent(ABC):
         self.writer.add_scalar("test/step", step, episode)
         self.writer.add_scalar("test/reward", total_reward, episode)
 
-    def evaluate(
-        self,
-        total_episode: int,
-        env: Env,
-        max_step: int,
-        load_cpkt: bool,
-    ) -> bool:
-        if load_ckpt and not self.load():
-            return False
+    def evaluate(self, total_episode: int, env: Env, max_step: int) -> float:
+        total_rewards = []
 
         for _ in range(total_episode):
+            total_reward = 0
             obs = env.reset()
+
             for _ in range(max_step):
-                act = self.get_act(obs, False)
+                act = self(obs, False)
                 obs, reward, done, _ = env.step(act)
+
+                total_reward += reward
                 if done:
                     break
 
-        return True
+            total_rewards.append(total_reward)
 
-    def train_test(
+        return np.mean(total_rewards)
+
+    def log_graph(self, env: Env) -> None:
+        obs = env.reset()
+        obs = torch.from_numpy(obs)
+        obs.unsqueeze_(0)
+        network = getattr(self, self.network_name)
+        self.writer.add_graph(network, obs)
+
+    def train_test_eval(
         self,
         train_env: Env,
         test_env: Env,
-        load_cpkt: bool,
-        total_episode: int,
-        max_step_per_episode: int,
-        episode_per_test: int,
-        episode_per_save: int,
+        eval_env: Env,
+        total_train_episode: int,
+        total_eval_episode: int = 5,
+        max_step_per_episode: int = 1000,
+        episode_per_test: int = 10,
+        episode_per_save: int = 50,
+        load_cpkt: bool = True,
     ):
+        self.log_graph(train_env)
+
         if load_ckpt:
             self.load()
 
-        for episode in range(1, total_episode):
+        for episode in range(1, total_train_episode):
             print(f"episode: {episode}")
-            self.train(episode, total_episode, train_env, max_step_per_episode)
+            self.train(episode, total_train_episode, train_env, max_step_per_episode)
 
             if episode_per_test > 0 and episode % episode_per_test == 0:
                 self.test(episode, test_env, max_step_per_episode)
             if episode_per_save > 0 and episode % episode_per_save == 0:
                 self.save()
+
+        if episode_per_save > 0:
+            self.save()
+
+        total_eval_episode = 10
+        mean_reward = self.evaluate(
+            total_eval_episode,
+            eval_env,
+            max_step_per_episode,
+        )
+
+        hparam_dict = {
+            "lr": self.lr,
+            "gamma": self.gamma,
+            "eps_train": self.eps_train,
+            "eps_test": self.eps_test,
+            "eps_min": self.eps_min,
+            "eps_decay_per_update": self.eps_decay_per_update,
+            "total_train_episode": total_train_episode,
+            "total_eval_episode": total_eval_episode,
+            "max_step_per_episode": max_step_per_episode,
+        }
+        metric_dict = {
+            "mean_reward": mean_reward,
+        }
+        self.writer.add_hparams(hparam_dict, metric_dict)
 
     def _predict_qvalue(self, obs: torch.Tensor, eps: float) -> torch.Tensor:
         network = getattr(self, self.network_name)

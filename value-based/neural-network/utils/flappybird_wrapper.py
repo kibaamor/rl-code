@@ -22,6 +22,7 @@ class FlappyBirdWrapper(Env):
         frame_size: Tuple[int, int] = (80, 80),
         display_screen: bool = False,
         force_fps: bool = True,
+        reward_shaping=True,
     ):
         self.game = FlappyBird()
         self.p = PLE(self.game, display_screen=display_screen, force_fps=force_fps)
@@ -32,6 +33,7 @@ class FlappyBirdWrapper(Env):
 
         self.stack_num = stack_num
         self.frame_size = frame_size
+        self.reward_shaping = reward_shaping
 
         self.observation_space = spaces.Space((stack_num,) + frame_size)
         self.action_space = spaces.Discrete(2)
@@ -44,7 +46,7 @@ class FlappyBirdWrapper(Env):
         obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
         # _, obs = cv2.threshold(obs, 159, 255, cv2.THRESH_BINARY)
         obs = np.reshape(obs, (1,) + self.frame_size)
-        obs = obs.astype(np.float32)
+        obs = obs.astype(np.float32) / 255
         return obs
 
     def _get_obs(self) -> np.ndarray:
@@ -57,6 +59,10 @@ class FlappyBirdWrapper(Env):
         reward = self.p.act(self.action_set[action])
         obs = self._get_obs()
         done = self.p.game_over()
+
+        if self.reward_shaping and not done:
+            reward += 0.01
+
         return obs, reward, done, None
 
     def reset(self) -> np.ndarray:
@@ -66,7 +72,9 @@ class FlappyBirdWrapper(Env):
     def save_screen(self, filename: str, preprocessed: bool = True) -> None:
         obs = self.p.getScreenRGB()
         if preprocessed:
-            obs = self.preprocess(obs)[0].astype(np.uint8)
+            obs = self.preprocess(obs)[0]
+            obs = obs * 255
+            obs = obs.astype(np.uint8)
             obs = np.transpose(obs, axes=(1, 0))
         else:
             obs = np.transpose(obs, axes=(1, 0, 2))
@@ -131,7 +139,8 @@ def main():
 
     # skip some frame
     for _ in range(20):
-        env.step(np.random.randint(env.action_space.n))
+        _, reward, _, _ = env.step(np.random.randint(env.action_space.n))
+        print(111, reward)
 
     env.save_screen(f"{saved_screen}/flappybird.png", False)
     env.save_screen(f"{saved_screen}/preprocessed_flappybird.png", True)
