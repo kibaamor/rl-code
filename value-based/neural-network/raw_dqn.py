@@ -50,6 +50,8 @@ def main():
     name = "raw_dqn"
 
     agent = RawDQNAgent(name)
+    # eval_env = FlappyBirdWrapper(caption=name, display_screen=True, force_fps=False)
+    # agent.evaluate(10, eval_env, 1000, True)
 
     train_env = FlappyBirdWrapper(caption=name)
     test_env = FlappyBirdWrapper(caption=name, display_screen=True)

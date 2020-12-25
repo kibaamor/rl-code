@@ -106,10 +106,11 @@ class NNQAgent(ABC):
         if self.ckpt_filename is not None:
             save_ckpt(network, self.ckpt_filename)
 
-    def load(self) -> None:
+    def load(self) -> bool:
         network = getattr(self, self.network_name)
         if self.ckpt_filename is not None:
-            load_ckpt(network, self.ckpt_filename)
+            return load_ckpt(network, self.ckpt_filename)
+        return False
 
     def get_act(self, obs: np.ndarray, is_train: bool) -> int:
         eps = self.eps if is_train else self.eps_test
@@ -166,6 +167,26 @@ class NNQAgent(ABC):
         self.writer.add_scalar("test/step", step, episode)
         self.writer.add_scalar("test/reward", total_reward, episode)
 
+    def evaluate(
+        self,
+        total_episode: int,
+        env: Env,
+        max_step: int,
+        load_cpkt: bool,
+    ) -> bool:
+        if load_ckpt and not self.load():
+            return False
+
+        for _ in range(total_episode):
+            obs = env.reset()
+            for _ in range(max_step):
+                act = self.get_act(obs, False)
+                obs, reward, done, _ = env.step(act)
+                if done:
+                    break
+
+        return True
+
     def train_test(
         self,
         train_env: Env,
@@ -183,9 +204,9 @@ class NNQAgent(ABC):
             print(f"episode: {episode}")
             self.train(episode, total_episode, train_env, max_step_per_episode)
 
-            if episode % episode_per_test == 0:
+            if episode_per_test > 0 and episode % episode_per_test == 0:
                 self.test(episode, test_env, max_step_per_episode)
-            if episode % episode_per_save == 0:
+            if episode_per_save > 0 and episode % episode_per_save == 0:
                 self.save()
 
     def _predict_qvalue(self, obs: torch.Tensor, eps: float) -> torch.Tensor:

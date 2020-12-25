@@ -64,6 +64,7 @@ class DQNWithExperienceReplayAgent(NNQAgent):
 
 def main():
     name = "dqn_with_experience_replay"
+
     memory_capacity = 50000
     batch_size = 128
     step_per_learn = 128
@@ -72,8 +73,11 @@ def main():
         memory_capacity, batch_size, step_per_learn, name
     )
 
+    # eval_env = FlappyBirdWrapper(caption=name, display_screen=True, force_fps=False)
+    # agent.evaluate(10, eval_env, 1000, True)
+
     train_env = FlappyBirdWrapper(caption=name)
-    test_env = FlappyBirdWrapper(caption=name, display_screen=True)
+    test_env = FlappyBirdWrapper(caption=name, display_screen=True, force_fps=True)
     load_cpkt = True
     total_episode = 100000
     max_step_per_episode = 1000

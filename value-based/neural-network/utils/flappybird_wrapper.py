@@ -21,9 +21,10 @@ class FlappyBirdWrapper(Env):
         stack_num: int = 4,
         frame_size: Tuple[int, int] = (80, 80),
         display_screen: bool = False,
+        force_fps: bool = True,
     ):
         self.game = FlappyBird()
-        self.p = PLE(self.game, display_screen=display_screen)
+        self.p = PLE(self.game, display_screen=display_screen, force_fps=force_fps)
         self.p.init()
         self.action_set = self.p.getActionSet()
 
