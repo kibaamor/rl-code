@@ -22,18 +22,15 @@ class FlappyBirdWrapper(Env):
         frame_size: Tuple[int, int] = (80, 80),
         display_screen: bool = False,
         force_fps: bool = True,
-        reward_shaping=True,
     ):
         self.game = FlappyBird()
         self.p = PLE(self.game, display_screen=display_screen, force_fps=force_fps)
         self.p.init()
         self.action_set = self.p.getActionSet()
-
         pygame.display.set_caption(caption)
 
         self.stack_num = stack_num
         self.frame_size = frame_size
-        self.reward_shaping = reward_shaping
 
         self.observation_space = spaces.Space((stack_num,) + frame_size)
         self.action_space = spaces.Discrete(2)
@@ -59,10 +56,6 @@ class FlappyBirdWrapper(Env):
         reward = self.p.act(self.action_set[action])
         obs = self._get_obs()
         done = self.p.game_over()
-
-        if self.reward_shaping and not done:
-            reward += 0.01
-
         return obs, reward, done, None
 
     def reset(self) -> np.ndarray:
