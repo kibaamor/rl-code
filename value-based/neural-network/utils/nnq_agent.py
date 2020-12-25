@@ -193,7 +193,7 @@ class NNQAgent(ABC):
 
     def log_graph(self, env: Env) -> None:
         obs = env.reset()
-        obs = torch.from_numpy(obs)
+        obs = torch.from_numpy(obs).to(self.device)
         obs.unsqueeze_(0)
         network = getattr(self, self.network_name)
         self.writer.add_graph(network, obs)

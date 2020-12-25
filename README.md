@@ -5,11 +5,13 @@
 ## HowToRun
 
 1. install requirements
+
     ```bash
     pip install -r requirements.txt
     ```
 
 2. run code
+
     ```bash
     cd value-based/tabular
 
