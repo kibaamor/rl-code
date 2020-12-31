@@ -31,11 +31,11 @@ class DQNPolicy(Policy):
     def update(self, buffer: PrioritizedReplayBuffer):
         batch = buffer.sample()
 
-        obss = torch.FloatTensor(batch.obss, device=self.device)
-        acts = torch.LongTensor(batch.acts, device=self.device).unsqueeze(1)
-        rews = torch.FloatTensor(batch.acts, device=self.device)
-        dones = torch.LongTensor(batch.acts, device=self.device)
-        next_obss = torch.FloatTensor(batch.next_obss, device=self.device)
+        obss = torch.FloatTensor(batch.obss).to(self.device)
+        acts = torch.LongTensor(batch.acts).to(self.device).unsqueeze(1)
+        rews = torch.FloatTensor(batch.acts).to(self.device)
+        dones = torch.LongTensor(batch.acts).to(self.device)
+        next_obss = torch.FloatTensor(batch.next_obss).to(self.device)
 
         qval_pred = self.network(obss).gather(1, acts).squeeze()
 
@@ -43,7 +43,7 @@ class DQNPolicy(Policy):
             qval_max = self.network(next_obss).max(-1)[0]
         qval_targ = rews + (1 - dones) * self.gamma * qval_max
 
-        errors = torch.abs(qval_pred - qval_targ).data.numpy()
+        errors = torch.abs(qval_pred - qval_targ).cpu().data.numpy()
         buffer.update_weight(batch.indexes, errors)
 
         loss = mse_loss(qval_pred, qval_targ)
@@ -76,8 +76,8 @@ def main():
     tester = Tester(test_env, test_per_step, max_step_per_episode)
 
     warmup_size = 1000
-    epochs = 10000
-    step_per_epoch = 3
+    epochs = 100000
+    step_per_epoch = 1
     collect_per_step = 128
     update_per_step = 1
 
