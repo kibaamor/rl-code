@@ -4,10 +4,10 @@ import gym
 import numpy as np
 from gym import Env
 from utils.gridworld import CliffWalkingWapper
-from utils.tabq_agent import TabQAgent
+from utils.policy import Policy
 
 
-class SarsaAgent(TabQAgent):
+class SarsaPolicy(Policy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -55,7 +55,7 @@ def main():
     env = CliffWalkingWapper(env)
     obs_n = env.observation_space.n
     act_n = env.action_space.n
-    agent = SarsaAgent(obs_n, act_n)
+    agent = SarsaPolicy(obs_n, act_n)
 
     total_episode = 1000
     max_step_per_episode = 100

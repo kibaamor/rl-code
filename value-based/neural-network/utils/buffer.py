@@ -27,11 +27,11 @@ class ReplayBuffer:
     """Experience replay
 
     >>> buffer = ReplayBuffer(10, 2)
-    >>> for i in range(10):
+    >>> for i in range(3):
     ...     assert i == len(buffer)
     ...     buffer.add(1, 2, 3, False, 4)
     >>> for i in range(20):
-    ...     assert 10 == len(buffer)
+    ...     assert 2 == len(buffer)
     >>> batch = buffer.sample()
     >>> len(batch.obss) == len(batch.acts) == len(batch.rews) == len(batch.dones)
     True
@@ -45,27 +45,37 @@ class ReplayBuffer:
         self.buffer_size = buffer_size
         self.batch_size = batch_size
 
-        self.obss = np.array([None] * buffer_size)
-        self.acts = np.array([None] * buffer_size)
-        self.rews = np.array([None] * buffer_size)
-        self.dones = np.array([None] * buffer_size)
-        self.next_obss = np.array([None] * buffer_size)
+        self.obss: np.ndarray = None
+        self.acts: np.ndarray = None
+        self.rews: np.ndarray = None
+        self.dones: np.ndarray = None
+        self.next_obss: np.ndarray = None
         self.indexes = np.arange(buffer_size)
         self.index = 0
+        self.fulled = False
 
     def __len__(self) -> int:
-        return self.index if self.obss[-1] is None else self.buffer_size
+        return self.batch_size if self.fulled else self.index
+
+    def _add(self, name: str, value: Any) -> None:
+        value = np.array(value)
+        batch = getattr(self, name, None)
+        if batch is None:
+            batch = np.empty((self.batch_size,) + value.shape)
+            setattr(self, name, batch)
+        batch[self.index] = value
 
     def add(self, obs: Any, act: Any, rew: float, done: bool, next_obs: Any) -> None:
-        self.obss[self.index] = obs
-        self.acts[self.index] = act
-        self.rews[self.index] = rew
-        self.dones[self.index] = done
-        self.next_obss[self.index] = next_obs
+        self._add("obss", obs)
+        self._add("acts", act)
+        self._add("rews", rew)
+        self._add("dones", done)
+        self._add("next_obss", next_obs)
 
         self.index += 1
-        if self.index >= self.buffer_size:
-            self.index -= self.buffer_size
+        if self.index >= self.batch_size:
+            self.fulled = True
+            self.index -= self.batch_size
 
     def sample(self) -> Batch:
         assert len(self) >= self.batch_size
@@ -85,11 +95,11 @@ class PrioritizedReplayBuffer(ReplayBuffer):
     """Prioritized replay buffer
 
     >>> buffer = PrioritizedReplayBuffer(10, 2, 0.9, 1.0)
-    >>> for i in range(10):
+    >>> for i in range(3):
     ...     assert i == len(buffer)
     ...     buffer.add(1, 2, 3, False, 4)
     >>> for i in range(20):
-    ...     assert 10 == len(buffer)
+    ...     assert 2 == len(buffer)
     >>> batch = buffer.sample()
     >>> len(batch.obss) == len(batch.acts) == len(batch.rews) == len(batch.dones)
     True

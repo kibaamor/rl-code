@@ -6,6 +6,7 @@ Pillow
 opencv-python
 pygame
 -e git+https://github.com/SamWqc/PyGame-Learning-Environment.git@832cc2d57d12f998464370b2b107ba93ab4d2ffe#egg=ple
+tqdm
 # dev
 black
 flake8

@@ -30,10 +30,9 @@
 
 ### 1.2 [Nerual Network Based](value-based/neural-network/README.md)
 
-1. [Raw DQN](value-based/neural-network/raw_dqn.py)
-2. [DQN with Experience Replay](value-based/neural-network/dqn_with_experience_replay.py)
-3. Double DQN
-4. Dualing DQN
+1. [DQN](value-based/neural-network/dqn.py)
+2. Double DQN
+3. Dualing DQN
 
 ## 2. Policy Based Learning
 

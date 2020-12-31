@@ -1,12 +1,11 @@
 import time
-from abc import ABC, abstractmethod
 
 import numpy as np
 from gym import Env
 
 
-class TabQAgent(ABC):
-    """Tabular base Q Learning agent"""
+class Policy:
+    """Tabular base Q Learning policy"""
 
     def __init__(
         self,
@@ -70,10 +69,8 @@ class TabQAgent(ABC):
 
         print(f"test total_step: {total_step}, total_reward: {total_reward}")
 
-    @abstractmethod
     def train(self, env: Env, max_step: int) -> None:
-        pass
+        raise NotImplementedError
 
-    @abstractmethod
     def learn(*args, **kwargs) -> None:
-        pass
+        raise NotImplementedError
