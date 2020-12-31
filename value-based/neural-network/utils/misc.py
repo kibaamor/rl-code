@@ -38,13 +38,14 @@ class Collector:
             act = policy(np.array([self.obs]))[0]
             next_obs, rew, done, _ = self.env.step(act)
 
+            self.buffer.add(self.obs, act, rew, done, next_obs)
+            rews.append(rew)
+
             self.step += 1
             self.obs = next_obs
             if done or self.step >= self.max_step_per_episode:
                 self.obs = self.env.reset()
 
-            self.buffer.add(self.obs, act, rew, done, next_obs)
-            rews.append(rew)
         cost_t = time.time() - beg_t
 
         return {
@@ -92,7 +93,7 @@ class Tester:
             "step_min": np.min(episode_steps),
             "step_max": np.max(episode_steps),
             "step_per_s": np.sum(episode_steps) / cost_t,
-            "s_per_episode": cost_t / self.episodes,
+            "ms_per_episode": 1000.0 * cost_t / self.episodes,
         }
 
 

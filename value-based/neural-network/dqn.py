@@ -54,9 +54,9 @@ class DQNPolicy(Policy):
         return {
             "loss": loss.item(),
             "err_mean": np.mean(errors),
+            "err_std": np.std(errors),
             "err_min": np.min(errors),
             "err_max": np.max(errors),
-            "err_std": np.std(errors),
         }
 
 
@@ -82,7 +82,7 @@ def main():
     update_per_step = 1
 
     lr = 1e-4
-    gamma = 0.7
+    gamma = 0.98
     policy = DQNPolicy(lr, gamma)
 
     logdir = name

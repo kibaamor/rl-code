@@ -19,12 +19,18 @@ class FlappyBirdWrapper(Env):
         self,
         caption="Flappy Bird",
         stack_num: int = 4,
+        frame_skip: int = 4,
         frame_size: Tuple[int, int] = (80, 80),
         display_screen: bool = False,
         force_fps: bool = True,
     ):
         self.game = FlappyBird()
-        self.p = PLE(self.game, display_screen=display_screen, force_fps=force_fps)
+        self.p = PLE(
+            self.game,
+            display_screen=display_screen,
+            force_fps=force_fps,
+            frame_skip=frame_skip,
+        )
         self.p.init()
         self.action_set = self.p.getActionSet()
         pygame.display.set_caption(caption)
