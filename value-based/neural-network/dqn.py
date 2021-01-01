@@ -1,4 +1,7 @@
+import argparse
+import pathlib
 from copy import deepcopy
+from os.path import join
 
 import numpy as np
 import torch
@@ -10,10 +13,10 @@ from utils.misc import Collector, Policy, Tester, train
 
 
 class DQNPolicy(Policy):
-    def __init__(self, lr: float, gamma: float):
+    def __init__(self, lr: float, gamma: float, use_relu: bool, dense_size: int):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.network = create_network(self.device)
+        self.network = create_network(self.device, use_relu, dense_size)
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
         self.gamma = gamma
         self.eps = 0.0
@@ -60,43 +63,193 @@ class DQNPolicy(Policy):
         }
 
 
+def get_args():
+    parser = argparse.ArgumentParser(
+        description="DQN",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "name",
+        type=str,
+        help="name for this train",
+    )
+    parser.add_argument(
+        "--buffer-size",
+        type=int,
+        default=20000,
+        metavar="N",
+        help="prioritized replay buffer size",
+    )
+    parser.add_argument(
+        "--warmup-size",
+        type=int,
+        default=1000,
+        metavar="N",
+        help="warm up size for prioritized replay buffer",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=128,
+        metavar="N",
+        help="batch size for training",
+    )
+    parser.add_argument(
+        "--alpha",
+        type=float,
+        default=0.9,
+        metavar="ALPHA",
+        help="alpha parameter for prioritized replay buffer",
+    )
+    parser.add_argument(
+        "--beta",
+        type=float,
+        default=1.0,
+        metavar="BETA",
+        help="beta parameter for prioritized replay buffer",
+    )
+    parser.add_argument(
+        "--max-step-per-episode",
+        type=int,
+        default=1000,
+        metavar="N",
+        help="max step per game episode",
+    )
+    parser.add_argument(
+        "--test-episode-per-step",
+        type=int,
+        default=3,
+        metavar="N",
+        help="test episode per step",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-4,
+        metavar="LR",
+        help="learning rate",
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.9,
+        metavar="M",
+        help="learning rate step gamma",
+    )
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=1000000,
+        metavar="N",
+        help="number of epochs to train",
+    )
+    parser.add_argument(
+        "--step-per-epoch",
+        type=int,
+        default=10,
+        metavar="N",
+        help="number of train step to epoch",
+    )
+    parser.add_argument(
+        "--collect-per-step",
+        type=int,
+        default=128,
+        metavar="N",
+        help="number of experience to collect per train step",
+    )
+    parser.add_argument(
+        "--update-per-step",
+        type=int,
+        default=128,
+        metavar="N",
+        help="number of policy updating per train step",
+    )
+
+    parser.add_argument(
+        "--eps-collect",
+        type=float,
+        default=0.9,
+        metavar="EPS",
+        help="e-greeding for collecting experience",
+    )
+    parser.add_argument(
+        "--eps-collect-min",
+        type=float,
+        default=0.01,
+        metavar="EPS",
+        help="minimum e-greeding for collecting experience",
+    )
+    parser.add_argument(
+        "--eps-test",
+        type=float,
+        default=0.9,
+        metavar="EPS",
+        help="e-greeding for testing policy",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        metavar="S",
+        help="random seed",
+    )
+
+    parser.add_argument(
+        "--use-relu",
+        action="store_true",
+        help="use relu or selu function in network",
+    )
+    parser.add_argument(
+        "--dense-size",
+        type=int,
+        default=256,
+        metavar="D",
+        help="dense size in network",
+    )
+
+    args = parser.parse_args()
+    return args
+
+
 def main():
-    buffer_size = 20000
-    batch_size = 128
-    buffer = PrioritizedReplayBuffer(buffer_size, batch_size, 0.9, 1.0)
+    args = get_args()
 
-    name = "dqn"
-    train_env = FlappyBirdWrapper(caption=name)
-    # test_env = FlappyBirdWrapper(caption=name, display_screen=True, force_fps=False)
-    test_env = FlappyBirdWrapper(caption=name)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
-    max_step_per_episode = 1000
-    test_per_step = 3
-    collector = Collector(train_env, buffer, max_step_per_episode)
-    tester = Tester(test_env, test_per_step, max_step_per_episode)
+    buffer = PrioritizedReplayBuffer(
+        args.buffer_size,
+        args.batch_size,
+        args.alpha,
+        args.beta,
+    )
 
-    warmup_size = 1000
-    epochs = 100000
-    step_per_epoch = 1
-    collect_per_step = 128
-    update_per_step = 1
+    train_env = FlappyBirdWrapper(caption=args.name, seed=args.seed)
+    test_env = FlappyBirdWrapper(caption=args.name, seed=args.seed)
 
-    lr = 1e-4
-    gamma = 0.98
-    policy = DQNPolicy(lr, gamma)
+    collector = Collector(train_env, buffer, args.max_step_per_episode)
+    tester = Tester(test_env, args.test_episode_per_step, args.max_step_per_episode)
 
-    logdir = name
+    policy = DQNPolicy(args.lr, args.gamma, args.use_relu, args.dense_size)
+
+    here = pathlib.Path(__file__).parent.resolve()
+    logdir = join(here, args.name)
     writer = SummaryWriter(logdir)
 
     def precollect(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
-        policy.eps = 0.9 - (0.9 - 0.01) * epoch / epochs
+        policy.eps = (
+            args.eps_collect
+            - (args.eps_collect - args.eps_collect_min) * epoch / args.epochs
+        )
         writer.add_scalar("0_train/eps", policy.eps, steps)
 
     def preupdate(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
         policy.eps = 0.0
 
     def pretest(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
-        policy.eps = 0.01
+        policy.eps = args.eps_test
 
     def save(policy: DQNPolicy, epoch: int, best_rew: float, rew: float) -> bool:
         if rew <= best_rew:
@@ -110,12 +263,12 @@ def main():
         policy,
         collector,
         tester,
-        warmup_size,
-        epochs,
-        step_per_epoch,
-        collect_per_step,
-        update_per_step,
-        batch_size,
+        args.warmup_size,
+        args.epochs,
+        args.step_per_epoch,
+        args.collect_per_step,
+        args.update_per_step,
+        args.batch_size,
         precollect_fn=precollect,
         preupdate_fn=preupdate,
         pretest_fn=pretest,

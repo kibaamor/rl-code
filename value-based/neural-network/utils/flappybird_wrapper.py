@@ -23,6 +23,7 @@ class FlappyBirdWrapper(Env):
         frame_size: Tuple[int, int] = (80, 80),
         display_screen: bool = False,
         force_fps: bool = True,
+        seed: int = 24,
     ):
         self.game = FlappyBird()
         self.p = PLE(
@@ -30,6 +31,7 @@ class FlappyBirdWrapper(Env):
             display_screen=display_screen,
             force_fps=force_fps,
             frame_skip=frame_skip,
+            rng=seed,
         )
         self.p.init()
         self.action_set = self.p.getActionSet()
@@ -83,7 +85,14 @@ class FlappyBirdWrapper(Env):
         img.save(filename)
 
 
-def create_network(device: torch.device) -> nn.Module:
+def create_network(
+    device: torch.device,
+    use_relu: bool,
+    dense_size: int,
+) -> nn.Module:
+    def lu():
+        return nn.ReLU(inplace=True) if use_relu else nn.SELU(inplace=True)
+
     # input (, 80, 80)
     network = nn.Sequential(
         *[
@@ -95,30 +104,28 @@ def create_network(device: torch.device) -> nn.Module:
                 stride=4,
                 padding=2,
             ),
-            nn.SELU(inplace=True),
+            lu(),
             # (32, 20, 20) => (32, 10, 10)
             nn.MaxPool2d(kernel_size=2),
             # (32, 10, 10) => (64, 5, 5)
             nn.Conv2d(
                 in_channels=32, out_channels=64, kernel_size=4, stride=2, padding=1
             ),
-            nn.SELU(inplace=True),
+            lu(),
             # (64, 5, 5) => (64, 3, 3)
             nn.Conv2d(
                 in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=0
             ),
-            nn.SELU(inplace=True),
+            lu(),
             # (64, 3, 3) => (64, 2, 2)
             nn.MaxPool2d(kernel_size=2, padding=1),
             # (64, 2, 2) => 256
             nn.Flatten(),
-            # (256,) => (256,)
-            nn.Linear(256, 256),
-            nn.SELU(inplace=True),
-            # (256,) => (256,)
-            nn.Linear(256, 256),
-            # (256,) => (2,)
-            nn.Linear(256, 2),
+            nn.Linear(256, dense_size),
+            lu(),
+            nn.Linear(dense_size, dense_size),
+            # => (2,)
+            nn.Linear(dense_size, 2),
         ]
     )
     network.to(device)
