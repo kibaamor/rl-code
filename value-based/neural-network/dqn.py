@@ -61,8 +61,8 @@ class DQNPolicy(Policy):
             "err_max": np.max(errors),
         }
 
-        for name, param in self.network.named_parameters():
-            info[f"dist/network/{name}"] = param
+        # for name, param in self.network.named_parameters():
+        #     info[f"dist/network/{name}"] = param
 
         return info
 

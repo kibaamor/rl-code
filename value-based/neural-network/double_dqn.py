@@ -89,10 +89,10 @@ class DoubleDQNPolicy(Policy):
             "err_max": np.max(errors),
         }
 
-        for name, param in self.network.named_parameters():
-            info[f"dist/network/{name}"] = param
-        for name, param in self.target_network.named_parameters():
-            info[f"dist/target_network/{name}"] = param
+        # for name, param in self.network.named_parameters():
+        #     info[f"dist/network/{name}"] = param
+        # for name, param in self.target_network.named_parameters():
+        #     info[f"dist/target_network/{name}"] = param
 
         return info
 

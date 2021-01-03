@@ -200,7 +200,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--buffer-size",
         type=int,
-        default=20000,
+        default=10 * 10000,
         metavar="N",
         help="prioritized replay buffer size",
     )
@@ -214,7 +214,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=128,
+        default=256,
         metavar="N",
         help="batch size for training",
     )
@@ -228,7 +228,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--test-episode-per-step",
         type=int,
-        default=3,
+        default=1,
         metavar="N",
         help="test episode per step",
     )
@@ -250,7 +250,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--epochs",
         type=int,
-        default=1000000,
+        default=1000 * 10000,
         metavar="N",
         help="number of epochs to train",
     )
@@ -264,14 +264,14 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--collect-per-step",
         type=int,
-        default=128,
+        default=256,
         metavar="N",
         help="number of experience to collect per train step",
     )
     parser.add_argument(
         "--update-per-step",
         type=int,
-        default=128,
+        default=1,
         metavar="N",
         help="number of policy updating per train step",
     )
