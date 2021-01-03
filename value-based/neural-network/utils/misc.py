@@ -1,3 +1,4 @@
+import argparse
 import time
 from typing import Callable, Optional
 
@@ -99,7 +100,10 @@ class Tester:
 
 def write_scalar(writer: SummaryWriter, prefix: str, info: dict, steps: int) -> None:
     for k, v in info.items():
-        writer.add_scalar(f"{prefix}/{k}", v, steps)
+        if k.startswith("dist/"):
+            writer.add_histogram(k[5:], v, steps)
+        else:
+            writer.add_scalar(f"{prefix}/{k}", v, steps)
 
 
 def train(
@@ -181,3 +185,138 @@ def train(
 
         policy.eval()
         last_rew = do_test(epoch)
+
+
+def get_arg_parser(desc: str) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=desc,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "name",
+        type=str,
+        help="name for this train",
+    )
+    parser.add_argument(
+        "--buffer-size",
+        type=int,
+        default=20000,
+        metavar="N",
+        help="prioritized replay buffer size",
+    )
+    parser.add_argument(
+        "--warmup-size",
+        type=int,
+        default=1000,
+        metavar="N",
+        help="warm up size for prioritized replay buffer",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=128,
+        metavar="N",
+        help="batch size for training",
+    )
+    parser.add_argument(
+        "--max-step-per-episode",
+        type=int,
+        default=1000,
+        metavar="N",
+        help="max step per game episode",
+    )
+    parser.add_argument(
+        "--test-episode-per-step",
+        type=int,
+        default=3,
+        metavar="N",
+        help="test episode per step",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-4,
+        metavar="LR",
+        help="learning rate",
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.9,
+        metavar="M",
+        help="learning rate step gamma",
+    )
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=1000000,
+        metavar="N",
+        help="number of epochs to train",
+    )
+    parser.add_argument(
+        "--step-per-epoch",
+        type=int,
+        default=10,
+        metavar="N",
+        help="number of train step to epoch",
+    )
+    parser.add_argument(
+        "--collect-per-step",
+        type=int,
+        default=128,
+        metavar="N",
+        help="number of experience to collect per train step",
+    )
+    parser.add_argument(
+        "--update-per-step",
+        type=int,
+        default=128,
+        metavar="N",
+        help="number of policy updating per train step",
+    )
+
+    parser.add_argument(
+        "--eps-collect",
+        type=float,
+        default=0.9,
+        metavar="EPS",
+        help="e-greeding for collecting experience",
+    )
+    parser.add_argument(
+        "--eps-collect-min",
+        type=float,
+        default=0.01,
+        metavar="EPS",
+        help="minimum e-greeding for collecting experience",
+    )
+    parser.add_argument(
+        "--eps-test",
+        type=float,
+        default=0.9,
+        metavar="EPS",
+        help="e-greeding for testing policy",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        metavar="S",
+        help="random seed",
+    )
+
+    parser.add_argument(
+        "--use-relu",
+        action="store_true",
+        help="use relu or selu function in network",
+    )
+    parser.add_argument(
+        "--dense-size",
+        type=int,
+        default=256,
+        metavar="D",
+        help="dense size in network",
+    )
+
+    return parser
