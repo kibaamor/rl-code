@@ -20,7 +20,7 @@ class FlappyBirdWrapper(Env):
         caption="Flappy Bird",
         stack_num: int = 4,
         frame_skip: int = 4,
-        frame_size: Tuple[int, int] = (80, 80),
+        frame_size: Tuple[int, int] = (84, 84),
         display_screen: bool = False,
         force_fps: bool = True,
         seed: int = 24,
@@ -87,43 +87,28 @@ class FlappyBirdWrapper(Env):
 
 def create_network(
     device: torch.device,
-    use_relu: bool,
+    use_selu: bool,
     dense_size: int,
 ) -> nn.Module:
     def lu():
-        return nn.ReLU(inplace=True) if use_relu else nn.SELU(inplace=True)
+        return nn.SELU(inplace=True) if use_selu else nn.ReLU(inplace=True)
 
-    # input (, 80, 80)
+    # input (4, 84, 84)
     network = nn.Sequential(
         *[
-            # (, 80, 80) => (32, 20, 20)
-            nn.Conv2d(
-                in_channels=4,
-                out_channels=32,
-                kernel_size=8,
-                stride=4,
-                padding=2,
-            ),
+            # (4, 84, 84) => (32, 20, 20)
+            nn.Conv2d(in_channels=4, out_channels=32, kernel_size=8, stride=4),
             lu(),
-            # (32, 20, 20) => (32, 10, 10)
-            nn.MaxPool2d(kernel_size=2),
-            # (32, 10, 10) => (64, 5, 5)
-            nn.Conv2d(
-                in_channels=32, out_channels=64, kernel_size=4, stride=2, padding=1
-            ),
+            # (32, 20, 20) => (64, 9, 9)
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
             lu(),
-            # (64, 5, 5) => (64, 3, 3)
-            nn.Conv2d(
-                in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=0
-            ),
+            # (64, 9, 9) => (64, 7, 7)
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
             lu(),
-            # (64, 3, 3) => (64, 2, 2)
-            nn.MaxPool2d(kernel_size=2, padding=1),
-            # (64, 2, 2) => 256
+            # (64, 7, 7) => 7*7*64=3136
             nn.Flatten(),
-            nn.Linear(256, dense_size),
+            nn.Linear(3136, dense_size),
             lu(),
-            nn.Linear(dense_size, dense_size),
             # => (2,)
             nn.Linear(dense_size, 2),
         ]

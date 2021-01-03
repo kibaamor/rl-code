@@ -12,10 +12,10 @@ from utils.misc import Collector, Policy, Tester, get_arg_parser, train
 
 
 class DQNPolicy(Policy):
-    def __init__(self, lr: float, gamma: float, use_relu: bool, dense_size: int):
+    def __init__(self, lr: float, gamma: float, use_selu: bool, dense_size: int):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.network = create_network(self.device, use_relu, dense_size)
+        self.network = create_network(self.device, use_selu, dense_size)
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
         self.gamma = gamma
         self.eps = 0.0
@@ -106,7 +106,7 @@ def main():
     collector = Collector(train_env, buffer, args.max_step_per_episode)
     tester = Tester(test_env, args.test_episode_per_step, args.max_step_per_episode)
 
-    policy = DQNPolicy(args.lr, args.gamma, args.use_relu, args.dense_size)
+    policy = DQNPolicy(args.lr, args.gamma, args.use_selu, args.dense_size)
 
     here = pathlib.Path(__file__).parent.resolve()
     logdir = join(here, args.name)

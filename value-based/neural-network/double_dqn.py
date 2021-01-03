@@ -16,15 +16,15 @@ class DoubleDQNPolicy(Policy):
         self,
         lr: float,
         gamma: float,
-        use_relu: bool,
+        use_selu: bool,
         dense_size: int,
         target_update_freq: int,
         tau: float,
     ):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.network = create_network(self.device, use_relu, dense_size)
-        self.target_network = create_network(self.device, use_relu, dense_size)
+        self.network = create_network(self.device, use_selu, dense_size)
+        self.target_network = create_network(self.device, use_selu, dense_size)
         self.target_network.load_state_dict(self.network.state_dict())
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
 
@@ -153,7 +153,7 @@ def main():
     policy = DoubleDQNPolicy(
         args.lr,
         args.gamma,
-        args.use_relu,
+        args.use_selu,
         args.dense_size,
         args.target_update_freq,
         args.tau,

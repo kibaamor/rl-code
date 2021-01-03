@@ -307,9 +307,9 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--use-relu",
+        "--use-selu",
         action="store_true",
-        help="use relu or selu function in network",
+        help="use selu or relu function in network",
     )
     parser.add_argument(
         "--dense-size",
