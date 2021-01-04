@@ -198,6 +198,20 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         help="name for this train",
     )
     parser.add_argument(
+        "--alpha",
+        type=float,
+        default=0.6,
+        metavar="ALPHA",
+        help="alpha parameter for prioritized replay buffer(0.0 to disable)",
+    )
+    parser.add_argument(
+        "--beta",
+        type=float,
+        default=0.4,
+        metavar="BETA",
+        help="beta parameter for prioritized replay buffer",
+    )
+    parser.add_argument(
         "--buffer-size",
         type=int,
         default=10 * 10000,

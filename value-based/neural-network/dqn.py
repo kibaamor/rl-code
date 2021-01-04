@@ -4,9 +4,8 @@ from os.path import join
 
 import numpy as np
 import torch
-from torch.nn.functional import mse_loss
 from torch.utils.tensorboard import SummaryWriter
-from utils.buffer import PrioritizedReplayBuffer
+from utils.buffer import PrioritizedReplayBuffer, ReplayBuffer
 from utils.flappybird_wrapper import FlappyBirdWrapper, create_network
 from utils.misc import Collector, Policy, Tester, get_arg_parser, train
 
@@ -31,6 +30,7 @@ class DQNPolicy(Policy):
         return acts.cpu().numpy()
 
     def update(self, buffer: PrioritizedReplayBuffer):
+        is_prb = isinstance(buffer, PrioritizedReplayBuffer)
         batch = buffer.sample()
 
         obss = torch.FloatTensor(batch.obss).to(self.device)
@@ -38,6 +38,7 @@ class DQNPolicy(Policy):
         rews = torch.FloatTensor(batch.acts).to(self.device)
         dones = torch.LongTensor(batch.acts).to(self.device)
         next_obss = torch.FloatTensor(batch.next_obss).to(self.device)
+        weights = torch.FloatTensor(batch.weights).to(self.device) if is_prb else 1.0
 
         qval_pred = self.network(obss).gather(1, acts).squeeze()
 
@@ -45,21 +46,29 @@ class DQNPolicy(Policy):
             qval_max = self.network(next_obss).max(-1)[0]
         qval_targ = rews + (1 - dones) * self.gamma * qval_max
 
-        errors = torch.abs(qval_pred - qval_targ).cpu().data.numpy()
-        buffer.update_weight(batch.indexes, errors)
+        td_err = qval_pred - qval_targ
 
-        loss = mse_loss(qval_pred, qval_targ)
+        loss = (td_err.pow(2) * weights).mean()
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         info = {
             "loss": loss.item(),
-            "err_mean": np.mean(errors),
-            "err_std": np.std(errors),
-            "err_min": np.min(errors),
-            "err_max": np.max(errors),
+            "err_mean": td_err.mean().item(),
+            "err_std": td_err.std().item(),
+            "err_min": td_err.min().item(),
+            "err_max": td_err.max().item(),
         }
+
+        if is_prb:
+            err_data = td_err.cpu().data.numpy()
+            buffer.update_weight(batch.indexes, err_data)
+
+            info["weights_mean"] = weights.mean().item()
+            info["weights_std"] = weights.std().item()
+            info["weights_min"] = weights.min().item()
+            info["weights_max"] = weights.max().item()
 
         # for name, param in self.network.named_parameters():
         #     info[f"dist/network/{name}"] = param
@@ -69,20 +78,6 @@ class DQNPolicy(Policy):
 
 def get_args():
     parser = get_arg_parser("dqn")
-    parser.add_argument(
-        "--alpha",
-        type=float,
-        default=0.9,
-        metavar="ALPHA",
-        help="alpha parameter for prioritized replay buffer",
-    )
-    parser.add_argument(
-        "--beta",
-        type=float,
-        default=1.0,
-        metavar="BETA",
-        help="beta parameter for prioritized replay buffer",
-    )
     args = parser.parse_args()
     return args
 
@@ -90,15 +85,18 @@ def get_args():
 def main():
     args = get_args()
 
+    if args.alpha > 0.0:
+        buffer = PrioritizedReplayBuffer(
+            args.buffer_size,
+            args.batch_size,
+            args.alpha,
+            args.beta,
+        )
+    else:
+        buffer = ReplayBuffer(args.buffer_size, args.batch_size)
+
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
-
-    buffer = PrioritizedReplayBuffer(
-        args.buffer_size,
-        args.batch_size,
-        args.alpha,
-        args.beta,
-    )
 
     train_env = FlappyBirdWrapper(caption=args.name, seed=args.seed)
     test_env = FlappyBirdWrapper(caption=args.name, seed=args.seed)
