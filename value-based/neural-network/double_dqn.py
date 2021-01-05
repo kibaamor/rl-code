@@ -164,10 +164,12 @@ def main():
     def precollect(
         policy: DoubleDQNPolicy, epoch: int, steps: int, updates: int
     ) -> None:
-        policy.eps = (
-            args.eps_collect
-            - (args.eps_collect - args.eps_collect_min) * epoch / args.epochs
-        )
+        if steps <= 1e6:
+            policy.eps = args.eps_collect - steps / 1e6 * (
+                args.eps_collect - args.eps_collect_min
+            )
+        else:
+            policy.eps = args.eps_collect_min
         writer.add_scalar("0_train/eps", policy.eps, steps)
 
     def preupdate(

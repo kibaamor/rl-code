@@ -127,8 +127,8 @@ class PrioritizedReplayBuffer(ReplayBuffer):
     def sample(self) -> Batch:
         assert len(self) >= self.batch_size
 
-        scalar = np.random.rand(self.batch_size) * self.weights.reduce()
-        indexes = self.weights.get_prefix_sum_index(scalar)
+        scalars = np.random.rand(self.batch_size) * self.weights.reduce()
+        indexes = self.weights.get_prefix_sum_index(scalars)
         weights = (self.weights[indexes] / self.min_prio) ** (-self.beta)
         return Batch(
             obss=self.obss[indexes],
@@ -203,14 +203,13 @@ class SumTree:
     def __setitem__(
         self, index: Union[int, np.ndarray], value: Union[float, np.ndarray]
     ) -> None:
-        assert isinstance(index, (int, np.ndarray))
         assert np.all(0 <= index) and np.all(index < self.size)
 
-        if isinstance(index, int):
+        if not isinstance(index, np.ndarray):
             index = np.array([index])
             value = np.array([value])
 
-        index += self.bound
+        index = index + self.bound  # DO NOT MODIFY INPUT
         self.value[index] = value
         while index[0] > 1:
             self.value[index >> 1] = self.value[index] + self.value[index ^ 1]
@@ -252,6 +251,7 @@ class SumTree:
             value = np.array([value], dtype=float)
         assert np.all(0.0 <= value) and np.all(value <= self.value[1])
 
+        value = value.copy()  # DO NOT MODIFY INPUT
         index = np.ones_like(value, dtype=np.int)
         while index[0] < self.bound:
             index <<= 1
