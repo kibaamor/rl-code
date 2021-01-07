@@ -1,14 +1,27 @@
 import argparse
 import time
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import torch
 import tqdm
 from gym import Env
+from torch import nn
 from torch.nn import Module
 from torch.utils.tensorboard import SummaryWriter
 from utils.buffer import ReplayBuffer
+
+
+def mlp(
+    sizes: List[int],
+    activation: Callable[[], nn.Module] = nn.ReLU,
+    output_activation: Callable[[], nn.Module] = nn.Identity,
+) -> nn.Module:
+    layers = []
+    for i in range(len(sizes) - 1):
+        act = activation if i < len(sizes) - 2 else output_activation
+        layers += [nn.Linear(sizes[i], sizes[i + 1]), act()]
+    return nn.Sequential(*layers)
 
 
 class Policy(Module):
@@ -327,11 +340,18 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         help="use selu or relu function in network",
     )
     parser.add_argument(
-        "--dense-size",
+        "--layer-num",
         type=int,
-        default=256,
-        metavar="D",
-        help="dense size in network",
+        default=1,
+        metavar="N",
+        help="hidden layer number",
+    )
+    parser.add_argument(
+        "--hidden-size",
+        type=int,
+        default=128,
+        metavar="N",
+        help="hidden layer size",
     )
 
     return parser

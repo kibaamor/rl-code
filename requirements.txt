@@ -2,12 +2,14 @@ numpy
 gym
 torch
 tensorboard
-Pillow
-opencv-python
-pygame
--e git+https://github.com/SamWqc/PyGame-Learning-Environment.git@832cc2d57d12f998464370b2b107ba93ab4d2ffe#egg=ple
+# Pillow
+# opencv-python
+# pygame
+# -e git+https://github.com/SamWqc/PyGame-Learning-Environment.git@832cc2d57d12f998464370b2b107ba93ab4d2ffe#egg=ple
 tqdm
-# dev
+
+# dev tools used by vscode
 black
 flake8
 pre-commit
+rope

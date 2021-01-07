@@ -2,25 +2,40 @@ import pathlib
 from copy import deepcopy
 from os.path import join
 
+import gym
 import numpy as np
 import torch
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from utils.buffer import PrioritizedReplayBuffer, ReplayBuffer
-from utils.flappybird_wrapper import FlappyBirdWrapper, create_network
-from utils.misc import Collector, Policy, Tester, get_arg_parser, train
+from utils.misc import Collector, Policy, Tester, get_arg_parser, mlp, train
 
 
 class DQNPolicy(Policy):
-    def __init__(self, lr: float, gamma: float, use_selu: bool, dense_size: int):
+    def __init__(
+        self,
+        obs_n: int,
+        act_n: int,
+        lr: float,
+        gamma: float,
+        layer_num: int,
+        hidden_size: int,
+        use_selu: bool,
+    ):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.network = create_network(self.device, use_selu, dense_size)
+        self.network = mlp(
+            [obs_n] + [hidden_size] * layer_num + [act_n],
+            nn.SELU if use_selu else nn.ReLU,
+            lambda: nn.Softmax(-1),
+        ).to(self.device)
+
         self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr)
         self.gamma = gamma
         self.eps = 0.0
 
     def forward(self, obss: np.ndarray) -> np.ndarray:
-        obss = torch.from_numpy(obss).to(self.device)
+        obss = torch.FloatTensor(obss).to(self.device)
         qvals = self.network(obss)
         if not np.isclose(self.eps, 0.0):
             for i in range(len(qvals)):
@@ -95,16 +110,30 @@ def main():
     else:
         buffer = ReplayBuffer(args.buffer_size, args.batch_size)
 
+    train_env = gym.make("CartPole-v1")
+    test_env = gym.make("CartPole-v1")
+    print(f"observation_space: {train_env.observation_space}")
+    print(f"action_space: {train_env.action_space}")
+    obs_n = train_env.observation_space.shape[0]
+    act_n = train_env.action_space.n
+
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
-
-    train_env = FlappyBirdWrapper(caption=args.name, seed=args.seed)
-    test_env = FlappyBirdWrapper(caption=args.name, seed=args.seed)
+    train_env.seed(args.seed)
+    test_env.seed(args.seed)
 
     collector = Collector(train_env, buffer, args.max_step_per_episode)
     tester = Tester(test_env, args.test_episode_per_step, args.max_step_per_episode)
 
-    policy = DQNPolicy(args.lr, args.gamma, args.use_selu, args.dense_size)
+    policy = DQNPolicy(
+        obs_n,
+        act_n,
+        args.lr,
+        args.gamma,
+        args.layer_num,
+        args.hidden_size,
+        args.use_selu,
+    )
 
     here = pathlib.Path(__file__).parent.resolve()
     logdir = join(here, args.name)
