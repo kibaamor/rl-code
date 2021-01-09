@@ -1,15 +1,13 @@
-import argparse
 import time
 from typing import Callable, List, Optional
 
+import gym
 import numpy as np
 import torch
 import tqdm
-from gym import Env
 from torch import nn
-from torch.nn import Module
 from torch.utils.tensorboard import SummaryWriter
-from utils.buffer import ReplayBuffer
+from utils.buffer import PrioritizedReplayBuffer, ReplayBuffer
 
 
 def mlp(
@@ -24,19 +22,82 @@ def mlp(
     return nn.Sequential(*layers)
 
 
-class Policy(Module):
-    def __init__(self):
+class Policy(nn.Module):
+    def __init__(
+        self,
+        network: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        gamma: float,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    ):
         super().__init__()
+        self.network = network.to(device)
+        self.optimizer = optimizer
+        self.gamma = gamma
+        self.eps = 0.0
+        self.device = device
 
     def forward(self, obss: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+        obss = torch.FloatTensor(obss).to(self.device)
+        qvals = self.network(obss)
+        if not np.isclose(self.eps, 0.0):
+            for i in range(len(qvals)):
+                if np.random.rand() < self.eps:
+                    torch.rand(qvals[i].shape, device=self.device, out=qvals[i])
+        acts = qvals.argmax(-1)
+        return acts.cpu().numpy()
 
-    def update(batch_size, buffer: ReplayBuffer) -> None:
+    def update(self, buffer: ReplayBuffer) -> dict:
+        is_prb = isinstance(buffer, PrioritizedReplayBuffer)
+        batch = buffer.sample()
+
+        obss = torch.FloatTensor(batch.obss).to(self.device)
+        acts = torch.LongTensor(batch.acts).to(self.device).unsqueeze(1)
+        rews = torch.FloatTensor(batch.acts).to(self.device)
+        dones = torch.LongTensor(batch.acts).to(self.device)
+        next_obss = torch.FloatTensor(batch.next_obss).to(self.device)
+        weights = torch.FloatTensor(batch.weights).to(self.device) if is_prb else 1.0
+
+        qval_pred = self.network(obss).gather(1, acts).squeeze()
+        qval_targ = self.compute_target_q(next_obss, rews, dones)
+
+        td_err = qval_pred - qval_targ
+
+        loss = (td_err.pow(2) * weights).mean()
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        info = {
+            "loss": loss.item(),
+            "err_mean": td_err.mean().item(),
+            "err_std": td_err.std().item(),
+            "err_min": td_err.min().item(),
+            "err_max": td_err.max().item(),
+        }
+
+        if is_prb:
+            err_data = td_err.cpu().data.numpy()
+            buffer.update_weight(batch.indexes, err_data)
+
+            info["weights_mean"] = weights.mean().item()
+            info["weights_std"] = weights.std().item()
+            info["weights_min"] = weights.min().item()
+            info["weights_max"] = weights.max().item()
+
+        return info
+
+    def compute_target_q(
+        self,
+        next_obss: torch.FloatTensor,
+        rews: torch.FloatTensor,
+        dones: torch.LongTensor,
+    ) -> torch.FloatTensor:
         raise NotImplementedError
 
 
 class Collector:
-    def __init__(self, env: Env, buffer: ReplayBuffer, max_step_per_episode: int):
+    def __init__(self, env: gym.Env, buffer: ReplayBuffer, max_step_per_episode: int):
         self.buffer = buffer
         self.env = env
         self.max_step_per_episode = max_step_per_episode
@@ -72,7 +133,7 @@ class Collector:
 
 
 class Tester:
-    def __init__(self, env: Env, episodes: int, max_step_per_episode: int):
+    def __init__(self, env: gym.Env, episodes: int, max_step_per_episode: int):
         self.env = env
         self.episodes = episodes
         self.max_step_per_episode = max_step_per_episode
@@ -198,160 +259,3 @@ def train(
 
         policy.eval()
         last_rew = do_test(epoch)
-
-
-def get_arg_parser(desc: str) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description=desc,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        "name",
-        type=str,
-        help="name for this train",
-    )
-    parser.add_argument(
-        "--lr",
-        type=float,
-        default=1e-4,
-        metavar="LR",
-        help="learning rate",
-    )
-    parser.add_argument(
-        "--gamma",
-        type=float,
-        default=0.9,
-        metavar="M",
-        help="learning rate step gamma",
-    )
-    parser.add_argument(
-        "--alpha",
-        type=float,
-        default=0.6,
-        metavar="ALPHA",
-        help="alpha parameter for prioritized replay buffer(0 to use replay buffer)",
-    )
-    parser.add_argument(
-        "--beta",
-        type=float,
-        default=0.4,
-        metavar="BETA",
-        help="beta parameter for prioritized replay buffer",
-    )
-    parser.add_argument(
-        "--buffer-size",
-        type=int,
-        default=20000,
-        metavar="N",
-        help="replay buffer size",
-    )
-    parser.add_argument(
-        "--warmup-size",
-        type=int,
-        default=256 * 4,
-        metavar="N",
-        help="warm up size for replay buffer(should greater than batch-size)",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=256,
-        metavar="N",
-        help=(
-            "batch size for training(should greater than collect-per-step"
-            + " when using replay buffer)"
-        ),
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=10000,
-        metavar="N",
-        help="number of epochs to train",
-    )
-    parser.add_argument(
-        "--step-per-epoch",
-        type=int,
-        default=1000,
-        metavar="N",
-        help="number of train step to epoch",
-    )
-    parser.add_argument(
-        "--collect-per-step",
-        type=int,
-        default=64,
-        metavar="N",
-        help="number of experience to collect per train step",
-    )
-    parser.add_argument(
-        "--update-per-step",
-        type=int,
-        default=1,
-        metavar="N",
-        help="number of policy updating per train step",
-    )
-    parser.add_argument(
-        "--max-step-per-episode",
-        type=int,
-        default=1000,
-        metavar="N",
-        help="max step per game episode",
-    )
-    parser.add_argument(
-        "--test-episode-per-step",
-        type=int,
-        default=5,
-        metavar="N",
-        help="test episode per step",
-    )
-    parser.add_argument(
-        "--eps-collect",
-        type=float,
-        default=0.1,
-        metavar="EPS",
-        help="e-greeding for collecting experience",
-    )
-    parser.add_argument(
-        "--eps-collect-min",
-        type=float,
-        default=0.01,
-        metavar="EPS",
-        help="minimum e-greeding for collecting experience",
-    )
-    parser.add_argument(
-        "--eps-test",
-        type=float,
-        default=0.01,
-        metavar="EPS",
-        help="e-greeding for testing policy",
-    )
-
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        metavar="S",
-        help="random seed",
-    )
-
-    parser.add_argument(
-        "--use-selu",
-        action="store_true",
-        help="use selu or relu function in network",
-    )
-    parser.add_argument(
-        "--layer-num",
-        type=int,
-        default=1,
-        metavar="N",
-        help="hidden layer number",
-    )
-    parser.add_argument(
-        "--hidden-size",
-        type=int,
-        default=128,
-        metavar="N",
-        help="hidden layer size",
-    )
-
-    return parser
