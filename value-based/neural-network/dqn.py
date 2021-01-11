@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
-from utils.misc import Policy, mlp, train
-from utils.utils import create_collector_tester, get_arg_parser, make_gym_env
+from utils.misc import Policy, train
+from utils.utils import create_collector_tester, create_network, get_arg_parser
 
 
 class DQNPolicy(Policy):
@@ -38,17 +38,7 @@ def get_args():
 
 
 def create_policy(args) -> Policy:
-    env = make_gym_env(args)
-    print(f"observation_space: {env.observation_space}")
-    print(f"action_space: {env.action_space}")
-    obs_n = env.observation_space.shape[0]
-    act_n = env.action_space.n
-
-    network = mlp(
-        [obs_n] + [args.hidden_size] * args.layer_num + [act_n],
-        nn.SELU if args.use_selu else nn.ReLU,
-    )
-
+    network = create_network(args)
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
     policy = DQNPolicy(network, optimizer, args.gamma)
     return policy

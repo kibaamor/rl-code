@@ -2,8 +2,9 @@ import argparse
 from typing import Tuple
 
 import gym
+from torch import nn
 from utils.buffer import PrioritizedReplayBuffer, ReplayBuffer
-from utils.misc import Collector, Tester
+from utils.misc import Collector, DuelingNetwork, Tester, mlp
 
 
 def get_arg_parser(desc: str) -> argparse.ArgumentParser:
@@ -54,7 +55,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--warmup-size",
         type=int,
-        default=256 * 4,
+        default=256 * 2,
         metavar="N",
         help="warm up size for replay buffer(should greater than batch-size)",
     )
@@ -78,21 +79,21 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--step-per-epoch",
         type=int,
-        default=1000,
+        default=100,
         metavar="N",
         help="number of train step to epoch",
     )
     parser.add_argument(
         "--collect-per-step",
         type=int,
-        default=64,
+        default=256,
         metavar="N",
         help="number of experience to collect per train step",
     )
     parser.add_argument(
         "--update-per-step",
         type=int,
-        default=1,
+        default=3,
         metavar="N",
         help="number of policy updating per train step",
     )
@@ -104,7 +105,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         help="max step per game episode",
     )
     parser.add_argument(
-        "--test-episode-per-step",
+        "--test-episode-per-epoch",
         type=int,
         default=5,
         metavar="N",
@@ -141,9 +142,11 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--use-selu",
-        action="store_true",
-        help="use selu or relu function in network",
+        "--activation",
+        type=str,
+        default="ident",
+        choices=["elu", "relu", "selu", "tanh", "ident"],
+        help="activation function in network",
     )
     parser.add_argument(
         "--layer-num",
@@ -159,6 +162,12 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         metavar="N",
         help="hidden layer size",
     )
+    parser.add_argument(
+        "--dueling",
+        action="store_true",
+        default=False,
+        help="use dueling network",
+    )
 
     return parser
 
@@ -167,6 +176,33 @@ def make_gym_env(args) -> gym.Env:
     env = gym.make("CartPole-v1")
     env.seed(args.seed)
     return env
+
+
+def create_network(args) -> nn.Module:
+    env = make_gym_env(args)
+    # print(f"observation_space: {env.observation_space}")
+    # print(f"action_space: {env.action_space}")
+    obs_n = env.observation_space.shape[0]
+    act_n = env.action_space.n
+
+    base_layers = [obs_n] + [args.hidden_size] * args.layer_num
+    act_tab = {
+        "elu": nn.ELU,
+        "relu": nn.ReLU,
+        "selu": nn.SELU,
+        "tanh": nn.Tanh,
+        "ident": None,
+    }
+    activation = act_tab[args.activation]
+
+    if args.dueling:
+        v_net = mlp(base_layers + [1], activation)
+        a_net = mlp(base_layers + [act_n], activation)
+        network = DuelingNetwork(v_net, a_net)
+    else:
+        network = mlp(base_layers + [act_n], activation)
+
+    return network
 
 
 def create_collector_tester(args) -> Tuple[Collector, Tester]:
@@ -180,5 +216,5 @@ def create_collector_tester(args) -> Tuple[Collector, Tester]:
     train_env = make_gym_env(args)
     test_env = make_gym_env(args)
     collector = Collector(train_env, buffer, args.max_step_per_episode)
-    tester = Tester(test_env, args.test_episode_per_step, args.max_step_per_episode)
+    tester = Tester(test_env, args.test_episode_per_epoch, args.max_step_per_episode)
     return collector, tester

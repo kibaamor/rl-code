@@ -7,8 +7,8 @@ import torch
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from utils.buffer import ReplayBuffer
-from utils.misc import Policy, mlp, train
-from utils.utils import create_collector_tester, get_arg_parser, make_gym_env
+from utils.misc import Policy, train
+from utils.utils import create_collector_tester, create_network, get_arg_parser
 
 
 class DoubleDQNPolicy(Policy):
@@ -17,12 +17,12 @@ class DoubleDQNPolicy(Policy):
         network: nn.Module,
         optimizer: torch.optim.Optimizer,
         gamma: float,
+        target_network: nn.Module,
         target_update_freq: int,
         tau: float,
     ):
         super().__init__(network, optimizer, gamma)
-
-        self.target_network = deepcopy(network).eval()
+        self.target_network = target_network.to(self.device)
         self.target_network.load_state_dict(self.network.state_dict())
 
         self.target_update_freq = target_update_freq
@@ -81,20 +81,16 @@ def get_args():
 
 
 def create_policy(args) -> Policy:
-    env = make_gym_env(args)
-    print(f"observation_space: {env.observation_space}")
-    print(f"action_space: {env.action_space}")
-    obs_n = env.observation_space.shape[0]
-    act_n = env.action_space.n
-
-    network = mlp(
-        [obs_n] + [args.hidden_size] * args.layer_num + [act_n],
-        nn.SELU if args.use_selu else nn.ReLU,
-    )
-
+    network = create_network(args)
+    target_network = create_network(args)
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
     policy = DoubleDQNPolicy(
-        network, optimizer, args.gamma, args.target_update_freq, args.tau
+        network,
+        optimizer,
+        args.gamma,
+        target_network,
+        args.target_update_freq,
+        args.tau,
     )
     return policy
 

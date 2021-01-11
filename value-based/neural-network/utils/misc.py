@@ -12,14 +12,28 @@ from utils.buffer import PrioritizedReplayBuffer, ReplayBuffer
 
 def mlp(
     sizes: List[int],
-    activation: Callable[[], nn.Module] = nn.ReLU,
-    output_activation: Callable[[], nn.Module] = nn.Identity,
+    activation: Optional[Callable[[], nn.Module]] = None,
+    output_activation: Optional[Callable[[], nn.Module]] = None,
 ) -> nn.Module:
     layers = []
     for i in range(len(sizes) - 1):
+        layers += [nn.Linear(sizes[i], sizes[i + 1])]
         act = activation if i < len(sizes) - 2 else output_activation
-        layers += [nn.Linear(sizes[i], sizes[i + 1]), act()]
+        if act is not None:
+            layers += [act()]
     return nn.Sequential(*layers)
+
+
+class DuelingNetwork(nn.Module):
+    def __init__(self, v_net, a_net):
+        super().__init__()
+        self.v_net = v_net
+        self.a_net = a_net
+
+    def forward(self, obs):
+        v = self.v_net(obs)
+        a = self.a_net(obs)
+        return v - a.mean() + a
 
 
 class Policy(nn.Module):
@@ -226,8 +240,6 @@ def train(
             precollect_fn(policy, epoch, steps, updates)
 
         with torch.no_grad():
-            if epoch == 1:
-                collector.collect(policy, warmup_size)
             info = collector.collect(policy, collect_per_step)
 
         steps += collect_per_step
@@ -240,11 +252,19 @@ def train(
         if preupdate_fn:
             preupdate_fn(policy, epoch, steps, updates)
 
+        losses = []
         for _ in range(update_per_step):
             updates += 1
             info = policy.update(collector.buffer)
             write_scalar(writer, "0_train", info, updates)
-            t.set_postfix({"loss": info["loss"]})
+            losses.append(info["loss"])
+        t.set_postfix({"loss_mean": np.mean(losses)})
+
+    if warmup_size > 0:
+        print(f"warming up for {warmup_size} experiences ... ", end="")
+        with torch.no_grad():
+            collector.collect(policy, warmup_size)
+        print("done")
 
     for epoch in range(1, 1 + epochs):
         policy.train()
@@ -257,5 +277,6 @@ def train(
                 do_update(epoch, t)
                 t.update(1)
 
-        policy.eval()
-        last_rew = do_test(epoch)
+            policy.eval()
+            last_rew = do_test(epoch)
+            t.set_postfix({"rew": last_rew})
