@@ -20,21 +20,21 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--lr",
         type=float,
-        default=1e-4,
+        default=0.001,
         metavar="LR",
         help="learning rate",
     )
     parser.add_argument(
         "--gamma",
         type=float,
-        default=0.9,
+        default=0.95,
         metavar="M",
         help="learning rate step gamma",
     )
     parser.add_argument(
         "--alpha",
         type=float,
-        default=0.6,
+        default=0.0,  # 0.6
         metavar="ALPHA",
         help="alpha parameter for prioritized replay buffer(0 to use replay buffer)",
     )
@@ -55,14 +55,14 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--warmup-size",
         type=int,
-        default=256 * 2,
+        default=20,
         metavar="N",
         help="warm up size for replay buffer(should greater than batch-size)",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=256,
+        default=20,
         metavar="N",
         help=(
             "batch size for training(should greater than collect-per-step"
@@ -86,14 +86,14 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--collect-per-step",
         type=int,
-        default=256,
+        default=10,
         metavar="N",
         help="number of experience to collect per train step",
     )
     parser.add_argument(
         "--update-per-step",
         type=int,
-        default=3,
+        default=10,
         metavar="N",
         help="number of policy updating per train step",
     )
@@ -114,7 +114,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--eps-collect",
         type=float,
-        default=0.1,
+        default=0.9,
         metavar="EPS",
         help="e-greeding for collecting experience",
     )
@@ -124,6 +124,13 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         default=0.01,
         metavar="EPS",
         help="minimum e-greeding for collecting experience",
+    )
+    parser.add_argument(
+        "--eps-collect-decay",
+        type=float,
+        default=0.9,
+        metavar="DECAY",
+        help="e-greeding for collecting experience",
     )
     parser.add_argument(
         "--eps-test",
@@ -144,21 +151,21 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--activation",
         type=str,
-        default="ident",
+        default="relu",
         choices=["elu", "relu", "selu", "tanh", "ident"],
         help="activation function in network",
     )
     parser.add_argument(
         "--layer-num",
         type=int,
-        default=1,
+        default=2,
         metavar="N",
         help="hidden layer number",
     )
     parser.add_argument(
         "--hidden-size",
         type=int,
-        default=128,
+        default=24,
         metavar="N",
         help="hidden layer size",
     )
@@ -168,12 +175,19 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         default=False,
         help="use dueling network",
     )
+    parser.add_argument(
+        "--test-render-delay",
+        type=float,
+        default=0.0,
+        metavar="F",
+        help="render delay for test(0.0 to disable render)",
+    )
 
     return parser
 
 
 def make_gym_env(args) -> gym.Env:
-    env = gym.make("CartPole-v1")
+    env = gym.make("CartPole-v0")
     env.seed(args.seed)
     return env
 
@@ -216,5 +230,10 @@ def create_collector_tester(args) -> Tuple[Collector, Tester]:
     train_env = make_gym_env(args)
     test_env = make_gym_env(args)
     collector = Collector(train_env, buffer, args.max_step_per_episode)
-    tester = Tester(test_env, args.test_episode_per_epoch, args.max_step_per_episode)
+    tester = Tester(
+        test_env,
+        args.test_episode_per_epoch,
+        args.max_step_per_episode,
+        args.test_render_delay,
+    )
     return collector, tester

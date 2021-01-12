@@ -90,6 +90,10 @@ class Policy(nn.Module):
             "err_max": td_err.max().item(),
         }
 
+        for param_group in self.optimizer.param_groups:
+            info["lr"] = param_group["lr"]
+            break
+
         if is_prb:
             err_data = td_err.cpu().data.numpy()
             buffer.update_weight(batch.indexes, err_data)
@@ -138,19 +142,26 @@ class Collector:
         cost_t = time.time() - beg_t
 
         return {
-            "rew_mean": np.mean(rews),
-            "rew_std": np.std(rews),
-            "rew_min": np.min(rews),
-            "rew_max": np.max(rews),
             "step_per_s": steps / cost_t,
+            # "rew_mean": np.mean(rews),
+            # "rew_std": np.std(rews),
+            # "rew_min": np.min(rews),
+            # "rew_max": np.max(rews),
         }
 
 
 class Tester:
-    def __init__(self, env: gym.Env, episodes: int, max_step_per_episode: int):
+    def __init__(
+        self,
+        env: gym.Env,
+        episodes: int,
+        max_step_per_episode: int,
+        render_delay: float,
+    ):
         self.env = env
         self.episodes = episodes
         self.max_step_per_episode = max_step_per_episode
+        self.render_delay = render_delay
 
     def test(self, policy: Policy):
         episode_rews = []
@@ -160,10 +171,17 @@ class Tester:
         for episode in range(1, 1 + self.episodes):
             rews = 0
             obs = self.env.reset()
+            if self.render_delay > 0.0:
+                self.env.render()
+                time.sleep(self.render_delay)
 
             for step in range(1, 1 + self.max_step_per_episode):
                 act = policy(np.array([obs]))[0]
                 obs, rew, done, _ = self.env.step(act)
+
+                if self.render_delay > 0.0:
+                    self.env.render()
+                    time.sleep(self.render_delay)
                 rews += rew
                 if done:
                     break
@@ -182,7 +200,7 @@ class Tester:
             "step_min": np.min(episode_steps),
             "step_max": np.max(episode_steps),
             "step_per_s": np.sum(episode_steps) / cost_t,
-            "ms_per_episode": 1000.0 * cost_t / self.episodes,
+            # "ms_per_episode": 1000.0 * cost_t / self.episodes,
         }
 
 
@@ -205,9 +223,9 @@ def train(
     collect_per_step: int,
     update_per_step: int,
     batch_size: int,
-    precollect_fn: Optional[Callable[[Policy, int], None]] = None,
-    preupdate_fn: Optional[Callable[[Policy, int, int], None]] = None,
-    pretest_fn: Optional[Callable[[Policy, int], None]] = None,
+    precollect_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
+    preupdate_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
+    pretest_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     save_fn: Optional[Callable[[Policy, int, float, float], bool]] = None,
 ) -> None:
     steps = 0
@@ -279,4 +297,4 @@ def train(
 
             policy.eval()
             last_rew = do_test(epoch)
-            t.set_postfix({"rew": last_rew})
+            t.set_postfix({"rew_mean": last_rew})

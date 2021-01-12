@@ -32,7 +32,6 @@
 
 1. [DQN](value-based/neural-network/dqn.py)
 2. [Double DQN](value-based/neural-network/double_dqn.py)
-3. Dualing DQN
 
 ## 2. Policy Based Learning
 

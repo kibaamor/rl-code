@@ -56,13 +56,13 @@ def main():
     logdir = join(here, args.name)
     writer = SummaryWriter(logdir)
 
+    total_updates = args.epochs * args.step_per_epoch * args.update_per_step
+
     def precollect(policy: Policy, epoch: int, steps: int, updates: int) -> None:
-        if steps <= 1e6:
-            policy.eps = args.eps_collect - steps / 1e6 * (
-                args.eps_collect - args.eps_collect_min
-            )
-        else:
-            policy.eps = args.eps_collect_min
+        ratio = updates * 1.0 / total_updates
+        eps = args.eps_collect - (args.eps_collect - args.eps_collect_min) * ratio
+        eps *= args.eps_collect_decay
+        policy.eps = eps if eps > args.eps_collect_min else args.eps_collect_min
         writer.add_scalar("0_train/eps", policy.eps, steps)
 
     def preupdate(policy: Policy, epoch: int, steps: int, updates: int) -> None:
