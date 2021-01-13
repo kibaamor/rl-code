@@ -50,6 +50,7 @@ class Policy(nn.Module):
         self.gamma = gamma
         self.eps = 0.0
         self.device = device
+        self.update_count = 0
 
     def forward(self, obss: np.ndarray) -> np.ndarray:
         obss = torch.FloatTensor(obss).to(self.device)
@@ -93,6 +94,11 @@ class Policy(nn.Module):
         for param_group in self.optimizer.param_groups:
             info["lr"] = param_group["lr"]
             break
+
+        if self.update_count % 100 == 0:
+            for name, param in self.network.named_parameters():
+                info[f"dist/network/{name}"] = param
+        self.update_count += 1
 
         if is_prb:
             err_data = td_err.cpu().data.numpy()
@@ -142,6 +148,7 @@ class Collector:
         cost_t = time.time() - beg_t
 
         return {
+            "buffer_size": len(self.buffer),
             "step_per_s": steps / cost_t,
             # "rew_mean": np.mean(rews),
             # "rew_std": np.std(rews),
@@ -200,7 +207,7 @@ class Tester:
             "step_min": np.min(episode_steps),
             "step_max": np.max(episode_steps),
             "step_per_s": np.sum(episode_steps) / cost_t,
-            # "ms_per_episode": 1000.0 * cost_t / self.episodes,
+            "ms_per_episode": 1000.0 * cost_t / self.episodes,
         }
 
 

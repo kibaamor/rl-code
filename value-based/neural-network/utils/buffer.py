@@ -55,13 +55,13 @@ class ReplayBuffer:
         self.fulled = False
 
     def __len__(self) -> int:
-        return self.batch_size if self.fulled else self.index
+        return self.buffer_size if self.fulled else self.index
 
     def _add(self, name: str, value: Any) -> None:
         value = np.array(value)
         batch = getattr(self, name, None)
         if batch is None:
-            batch = np.empty((self.batch_size,) + value.shape)
+            batch = np.empty((self.buffer_size,) + value.shape)
             setattr(self, name, batch)
         batch[self.index] = value
 
@@ -73,9 +73,9 @@ class ReplayBuffer:
         self._add("next_obss", next_obs)
 
         self.index += 1
-        if self.index >= self.batch_size:
+        if self.index >= self.buffer_size:
             self.fulled = True
-            self.index -= self.batch_size
+            self.index -= self.buffer_size
 
     def sample(self) -> Batch:
         assert len(self) >= self.batch_size

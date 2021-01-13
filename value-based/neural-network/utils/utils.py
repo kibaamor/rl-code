@@ -18,6 +18,12 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         help="name for this train",
     )
     parser.add_argument(
+        "--game",
+        type=str,
+        default="MountainCar-v0",
+        help="gym game name for training",
+    )
+    parser.add_argument(
         "--lr",
         type=float,
         default=0.001,
@@ -27,7 +33,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--gamma",
         type=float,
-        default=0.95,
+        default=0.99,
         metavar="M",
         help="learning rate step gamma",
     )
@@ -48,21 +54,21 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--buffer-size",
         type=int,
-        default=20000,
+        default=10000,
         metavar="N",
         help="replay buffer size",
     )
     parser.add_argument(
         "--warmup-size",
         type=int,
-        default=20,
+        default=256,
         metavar="N",
         help="warm up size for replay buffer(should greater than batch-size)",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=20,
+        default=128,
         metavar="N",
         help=(
             "batch size for training(should greater than collect-per-step"
@@ -86,14 +92,14 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--collect-per-step",
         type=int,
-        default=10,
+        default=8,
         metavar="N",
         help="number of experience to collect per train step",
     )
     parser.add_argument(
         "--update-per-step",
         type=int,
-        default=10,
+        default=1,
         metavar="N",
         help="number of policy updating per train step",
     )
@@ -165,7 +171,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--hidden-size",
         type=int,
-        default=24,
+        default=2048,
         metavar="N",
         help="hidden layer size",
     )
@@ -187,7 +193,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
 
 
 def make_gym_env(args) -> gym.Env:
-    env = gym.make("CartPole-v0")
+    env = gym.make(args.game)
     env.seed(args.seed)
     return env
 
