@@ -41,6 +41,11 @@ def create_policy(args) -> Policy:
     network = create_network(args)
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
     policy = DQNPolicy(network, optimizer, args.gamma)
+
+    if args.ckpt is not None:
+        policy.load_state_dict(torch.load(args.ckpt))
+        print(f"load checkpoint policy from file '{args.ckpt}'")
+
     return policy
 
 
@@ -56,26 +61,22 @@ def main():
     logdir = join(here, args.name)
     writer = SummaryWriter(logdir)
 
-    total_updates = args.epochs * args.step_per_epoch * args.update_per_step
-
-    def precollect(policy: Policy, epoch: int, steps: int, updates: int) -> None:
-        ratio = updates * 1.0 / total_updates
-        eps = args.eps_collect - (args.eps_collect - args.eps_collect_min) * ratio
-        eps *= args.eps_collect_decay
+    def precollect(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
+        eps = args.eps_collect * (args.eps_collect_gamma ** epoch)
         policy.eps = eps if eps > args.eps_collect_min else args.eps_collect_min
         writer.add_scalar("0_train/eps", policy.eps, steps)
 
-    def preupdate(policy: Policy, epoch: int, steps: int, updates: int) -> None:
+    def preupdate(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
         policy.eps = 0.0
 
-    def pretest(policy: Policy, epoch: int, steps: int, updates: int) -> None:
+    def pretest(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
         policy.eps = args.eps_test
 
-    def save(policy: Policy, epoch: int, best_rew: float, rew: float) -> bool:
+    def save(policy: DQNPolicy, epoch: int, best_rew: float, rew: float) -> bool:
         if rew <= best_rew:
             return True
         policy = deepcopy(policy).to(torch.device("cpu"))
-        torch.save(policy.state_dict(), f"{logdir}/dqn_flappybird_{rew:.3f}.pth")
+        torch.save(policy.state_dict(), f"{logdir}/dqn_{args.game}_{rew:.2f}.pth")
         return True
 
     collector, tester = create_collector_tester(args)

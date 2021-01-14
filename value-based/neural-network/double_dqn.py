@@ -65,7 +65,7 @@ def get_args():
     parser.add_argument(
         "--target-update-freq",
         type=int,
-        default=10,
+        default=32,
         metavar="N",
         help="target network update frequency",
     )
@@ -107,26 +107,26 @@ def main():
     logdir = join(here, args.name)
     writer = SummaryWriter(logdir)
 
-    def precollect(policy: Policy, epoch: int, steps: int, updates: int) -> None:
-        if steps <= 1e6:
-            policy.eps = args.eps_collect - steps / 1e6 * (
-                args.eps_collect - args.eps_collect_min
-            )
-        else:
-            policy.eps = args.eps_collect_min
+    def precollect(
+        policy: DoubleDQNPolicy, epoch: int, steps: int, updates: int
+    ) -> None:
+        eps = args.eps_collect * (args.eps_collect_gamma ** epoch)
+        policy.eps = eps if eps > args.eps_collect_min else args.eps_collect_min
         writer.add_scalar("0_train/eps", policy.eps, steps)
 
-    def preupdate(policy: Policy, epoch: int, steps: int, updates: int) -> None:
+    def preupdate(
+        policy: DoubleDQNPolicy, epoch: int, steps: int, updates: int
+    ) -> None:
         policy.eps = 0.0
 
-    def pretest(policy: Policy, epoch: int, steps: int, updates: int) -> None:
+    def pretest(policy: DoubleDQNPolicy, epoch: int, steps: int, updates: int) -> None:
         policy.eps = args.eps_test
 
-    def save(policy: Policy, epoch: int, best_rew: float, rew: float) -> bool:
+    def save(policy: DoubleDQNPolicy, epoch: int, best_rew: float, rew: float) -> bool:
         if rew <= best_rew:
             return True
         policy = deepcopy(policy).to(torch.device("cpu"))
-        torch.save(policy.state_dict(), f"{logdir}/dqn_flappybird_{rew:.3f}.pth")
+        torch.save(policy.state_dict(), f"{logdir}/dqn_{args.game}_{rew:.2f}.pth")
         return True
 
     collector, tester = create_collector_tester(args)

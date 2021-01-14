@@ -24,16 +24,35 @@ def mlp(
     return nn.Sequential(*layers)
 
 
-class DuelingNetwork(nn.Module):
-    def __init__(self, v_net, a_net):
+class QNetwork(nn.Module):
+    def __init__(
+        self,
+        obs_n: int,
+        act_n: int,
+        layer_num: int,
+        hidden_size: int,
+        dueling: bool,
+        activation: Optional[Callable[[], nn.Module]],
+    ):
         super().__init__()
-        self.v_net = v_net
-        self.a_net = a_net
+        self.dueling = dueling
+
+        self.fc1 = mlp([obs_n] + [hidden_size] * layer_num, activation, activation)
+        if dueling:
+            self.a = nn.Linear(hidden_size, act_n)
+            self.v = nn.Linear(hidden_size, 1)
+        else:
+            self.fc2 = nn.Linear(hidden_size, act_n)
 
     def forward(self, obs):
-        v = self.v_net(obs)
-        a = self.a_net(obs)
-        return v - a.mean() + a
+        out = self.fc1(obs)
+        if self.dueling:
+            a = self.a(out)
+            v = self.v(out)
+            out = v - a.mean() + a
+        else:
+            out = self.fc2(out)
+        return out
 
 
 class Policy(nn.Module):
@@ -95,7 +114,7 @@ class Policy(nn.Module):
             info["lr"] = param_group["lr"]
             break
 
-        if self.update_count % 100 == 0:
+        if self.update_count % 500 == 0:
             for name, param in self.network.named_parameters():
                 info[f"dist/network/{name}"] = param
         self.update_count += 1
@@ -230,10 +249,12 @@ def train(
     collect_per_step: int,
     update_per_step: int,
     batch_size: int,
+    preepoch_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     precollect_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     preupdate_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     pretest_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     save_fn: Optional[Callable[[Policy, int, float, float], bool]] = None,
+    postepoch_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
 ) -> None:
     steps = 0
     updates = 0
@@ -293,6 +314,10 @@ def train(
 
     for epoch in range(1, 1 + epochs):
         policy.train()
+
+        if preepoch_fn:
+            preepoch_fn(policy, epoch, steps, updates)
+
         if not do_save(epoch):
             break
 
@@ -305,3 +330,6 @@ def train(
             policy.eval()
             last_rew = do_test(epoch)
             t.set_postfix({"rew_mean": last_rew})
+
+        if postepoch_fn:
+            postepoch_fn(policy, epoch, steps, updates)

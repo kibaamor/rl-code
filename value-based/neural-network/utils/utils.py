@@ -4,7 +4,7 @@ from typing import Tuple
 import gym
 from torch import nn
 from utils.buffer import PrioritizedReplayBuffer, ReplayBuffer
-from utils.misc import Collector, DuelingNetwork, Tester, mlp
+from utils.misc import Collector, QNetwork, Tester
 
 
 def get_arg_parser(desc: str) -> argparse.ArgumentParser:
@@ -20,13 +20,13 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--game",
         type=str,
-        default="MountainCar-v0",
+        default="CartPole-v0",
         help="gym game name for training",
     )
     parser.add_argument(
         "--lr",
         type=float,
-        default=0.001,
+        default=1e-6,
         metavar="LR",
         help="learning rate",
     )
@@ -120,7 +120,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--eps-collect",
         type=float,
-        default=0.9,
+        default=0.6,
         metavar="EPS",
         help="e-greeding for collecting experience",
     )
@@ -132,10 +132,10 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         help="minimum e-greeding for collecting experience",
     )
     parser.add_argument(
-        "--eps-collect-decay",
+        "--eps-collect-gamma",
         type=float,
-        default=0.9,
-        metavar="DECAY",
+        default=0.998,
+        metavar="EPS-GAMMA",
         help="e-greeding for collecting experience",
     )
     parser.add_argument(
@@ -171,7 +171,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--hidden-size",
         type=int,
-        default=2048,
+        default=256,
         metavar="N",
         help="hidden layer size",
     )
@@ -187,6 +187,13 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         default=0.0,
         metavar="F",
         help="render delay for test(0.0 to disable render)",
+    )
+    parser.add_argument(
+        "--ckpt",
+        type=str,
+        default=None,
+        metavar="CKPT",
+        help="checkpoint path for resume policy",
     )
 
     return parser
@@ -205,7 +212,6 @@ def create_network(args) -> nn.Module:
     obs_n = env.observation_space.shape[0]
     act_n = env.action_space.n
 
-    base_layers = [obs_n] + [args.hidden_size] * args.layer_num
     act_tab = {
         "elu": nn.ELU,
         "relu": nn.ReLU,
@@ -215,14 +221,9 @@ def create_network(args) -> nn.Module:
     }
     activation = act_tab[args.activation]
 
-    if args.dueling:
-        v_net = mlp(base_layers + [1], activation)
-        a_net = mlp(base_layers + [act_n], activation)
-        network = DuelingNetwork(v_net, a_net)
-    else:
-        network = mlp(base_layers + [act_n], activation)
-
-    return network
+    return QNetwork(
+        obs_n, act_n, args.layer_num, args.hidden_size, args.dueling, activation
+    )
 
 
 def create_collector_tester(args) -> Tuple[Collector, Tester]:
