@@ -255,7 +255,7 @@ def train(
     pretest_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     save_fn: Optional[Callable[[Policy, int, float, float], bool]] = None,
     postepoch_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
-) -> None:
+) -> float:
     steps = 0
     updates = 0
     last_rew, best_rew = -np.inf, -np.inf
@@ -272,12 +272,11 @@ def train(
     def do_save(epoch: int) -> bool:
         nonlocal best_rew
 
+        running = True
         if save_fn:
-            if not save_fn(policy, epoch, best_rew, last_rew):
-                return False
-
+            running = save_fn(policy, epoch, best_rew, last_rew)
         best_rew = max(best_rew, last_rew)
-        return True
+        return running
 
     def do_collect(epoch: int, t: tqdm.tqdm) -> None:
         nonlocal steps
@@ -333,3 +332,5 @@ def train(
 
         if postepoch_fn:
             postepoch_fn(policy, epoch, steps, updates)
+
+    return best_rew

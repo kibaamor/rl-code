@@ -1,6 +1,8 @@
 import pathlib
+from argparse import ArgumentParser
 from copy import deepcopy
 from os.path import join
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -31,8 +33,10 @@ class DQNPolicy(Policy):
         return qval_targ
 
 
-def get_args():
+def get_args(parser_hook: Optional[Callable[[ArgumentParser], None]] = None):
     parser = get_arg_parser("dqn")
+    if parser_hook is not None:
+        parser_hook(parser)
     args = parser.parse_args()
     return args
 
@@ -49,9 +53,7 @@ def create_policy(args) -> Policy:
     return policy
 
 
-def main():
-    args = get_args()
-
+def train_dqn(args) -> float:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -77,11 +79,13 @@ def main():
             return True
         policy = deepcopy(policy).to(torch.device("cpu"))
         torch.save(policy.state_dict(), f"{logdir}/dqn_{args.game}_{rew:.2f}.pth")
+        if args.max_reward is not None:
+            return rew < args.max_reward
         return True
 
     collector, tester = create_collector_tester(args)
 
-    train(
+    return train(
         writer,
         policy,
         collector,
@@ -100,4 +104,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = get_args()
+    best_rew = train_dqn(args)
+    print(f"best rewards: {best_rew}")

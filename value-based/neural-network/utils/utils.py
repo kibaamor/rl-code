@@ -7,14 +7,15 @@ from utils.buffer import PrioritizedReplayBuffer, ReplayBuffer
 from utils.misc import Collector, QNetwork, Tester
 
 
-def get_arg_parser(desc: str) -> argparse.ArgumentParser:
+def get_arg_parser(name: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=desc,
+        description=name,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "name",
+        "--name",
         type=str,
+        default=name,
         help="name for this train",
     )
     parser.add_argument(
@@ -22,6 +23,13 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
         type=str,
         default="CartPole-v0",
         help="gym game name for training",
+    )
+    parser.add_argument(
+        "--max-reward",
+        type=float,
+        default=None,
+        metavar="R",
+        help="max reward for stopping trainning",
     )
     parser.add_argument(
         "--lr",
@@ -78,14 +86,14 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--epochs",
         type=int,
-        default=10000,
+        default=100,
         metavar="N",
         help="number of epochs to train",
     )
     parser.add_argument(
         "--step-per-epoch",
         type=int,
-        default=100,
+        default=10000,
         metavar="N",
         help="number of train step to epoch",
     )
@@ -113,7 +121,7 @@ def get_arg_parser(desc: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--test-episode-per-epoch",
         type=int,
-        default=5,
+        default=80,
         metavar="N",
         help="test episode per step",
     )

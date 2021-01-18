@@ -1,6 +1,8 @@
 import pathlib
+from argparse import ArgumentParser
 from copy import deepcopy
 from os.path import join
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -60,7 +62,7 @@ class DoubleDQNPolicy(Policy):
             )
 
 
-def get_args():
+def get_args(parser_hook: Optional[Callable[[ArgumentParser], None]] = None):
     parser = get_arg_parser("double-dqn")
     parser.add_argument(
         "--target-update-freq",
@@ -76,6 +78,8 @@ def get_args():
         metavar="TAU",
         help="target network soft update parameters",
     )
+    if parser_hook is not None:
+        parser_hook(parser)
     args = parser.parse_args()
     return args
 
@@ -92,12 +96,15 @@ def create_policy(args) -> Policy:
         args.target_update_freq,
         args.tau,
     )
+
+    if args.ckpt is not None:
+        policy.load_state_dict(torch.load(args.ckpt))
+        print(f"load checkpoint policy from file '{args.ckpt}'")
+
     return policy
 
 
-def main():
-    args = get_args()
-
+def train_double_dqn(args):
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -127,6 +134,8 @@ def main():
             return True
         policy = deepcopy(policy).to(torch.device("cpu"))
         torch.save(policy.state_dict(), f"{logdir}/dqn_{args.game}_{rew:.2f}.pth")
+        if args.max_reward is not None:
+            return rew < args.max_reward
         return True
 
     collector, tester = create_collector_tester(args)
@@ -150,4 +159,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = get_args()
+    best_rew = train_double_dqn(args)
+    print(f"best rewards: {best_rew}")
