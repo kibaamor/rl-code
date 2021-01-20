@@ -68,8 +68,11 @@ def optimize_double_dqn(trials: int):
     )
     study.optimize(double_dqn_objective, n_trials=trials)
 
-    print(study.best_params)
-    print(study.best_value)
+    trial = study.best_trial
+    print("  Value: ", trial.value)
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print("    {}: {}".format(key, value))
 
 
 def main():

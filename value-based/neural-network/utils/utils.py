@@ -1,5 +1,4 @@
 import argparse
-from typing import Tuple
 
 import gym
 from torch import nn
@@ -165,14 +164,14 @@ def get_arg_parser(name: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--activation",
         type=str,
-        default="relu",
+        default="ident",
         choices=["elu", "relu", "selu", "tanh", "ident"],
         help="activation function in network",
     )
     parser.add_argument(
         "--layer-num",
         type=int,
-        default=2,
+        default=1,
         metavar="N",
         help="hidden layer number",
     )
@@ -182,6 +181,12 @@ def get_arg_parser(name: str) -> argparse.ArgumentParser:
         default=256,
         metavar="N",
         help="hidden layer size",
+    )
+    parser.add_argument(
+        "--max-loss",
+        type=float,
+        default=1e8,
+        help="stopping training when loss greater than max loss",
     )
     parser.add_argument(
         "--dueling",
@@ -202,6 +207,12 @@ def get_arg_parser(name: str) -> argparse.ArgumentParser:
         default=None,
         metavar="CKPT",
         help="checkpoint path for resume policy",
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        default=False,
+        help="Test policy performance only",
     )
 
     return parser
@@ -234,7 +245,7 @@ def create_network(args) -> nn.Module:
     )
 
 
-def create_collector_tester(args) -> Tuple[Collector, Tester]:
+def create_collector(args) -> Collector:
     if args.alpha > 0.0:
         buffer = PrioritizedReplayBuffer(
             args.buffer_size, args.batch_size, args.alpha, args.beta
@@ -243,12 +254,16 @@ def create_collector_tester(args) -> Tuple[Collector, Tester]:
         buffer = ReplayBuffer(args.buffer_size, args.batch_size)
 
     train_env = make_gym_env(args)
-    test_env = make_gym_env(args)
     collector = Collector(train_env, buffer, args.max_step_per_episode)
+    return collector
+
+
+def create_tester(args) -> Tester:
+    test_env = make_gym_env(args)
     tester = Tester(
         test_env,
         args.test_episode_per_epoch,
         args.max_step_per_episode,
         args.test_render_delay,
     )
-    return collector, tester
+    return tester

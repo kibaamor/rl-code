@@ -9,8 +9,8 @@ import torch
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from utils.buffer import ReplayBuffer
-from utils.misc import Policy, train
-from utils.utils import create_collector_tester, create_network, get_arg_parser
+from utils.misc import Policy, train, watch
+from utils.utils import create_collector, create_network, create_tester, get_arg_parser
 
 
 class DoubleDQNPolicy(Policy):
@@ -104,7 +104,9 @@ def create_policy(args) -> Policy:
     return policy
 
 
-def train_double_dqn(args):
+def train_double_dqn(args) -> None:
+    print(args)
+
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -138,9 +140,10 @@ def train_double_dqn(args):
             return rew < args.max_reward
         return True
 
-    collector, tester = create_collector_tester(args)
+    collector = create_collector(args)
+    tester = create_tester(args)
 
-    train(
+    best_rew = train(
         writer,
         policy,
         collector,
@@ -151,14 +154,24 @@ def train_double_dqn(args):
         args.collect_per_step,
         args.update_per_step,
         args.batch_size,
+        max_loss=args.max_loss,
         precollect_fn=precollect,
         preupdate_fn=preupdate,
         pretest_fn=pretest,
         save_fn=save,
     )
+    print(f"best rewards: {best_rew}")
+
+
+def watch_double_dqn(args) -> None:
+    policy = create_policy(args)
+    tester = create_tester(args)
+    watch(policy, tester, args.epochs)
 
 
 if __name__ == "__main__":
     args = get_args()
-    best_rew = train_double_dqn(args)
-    print(f"best rewards: {best_rew}")
+    if args.watch:
+        watch_double_dqn(args)
+    else:
+        train_double_dqn(args)

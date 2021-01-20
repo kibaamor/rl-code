@@ -1,4 +1,5 @@
 import time
+from pprint import pprint
 from typing import Callable, List, Optional
 
 import gym
@@ -249,6 +250,8 @@ def train(
     collect_per_step: int,
     update_per_step: int,
     batch_size: int,
+    *,
+    max_loss: Optional[float] = None,
     preepoch_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     precollect_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
     preupdate_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
@@ -303,7 +306,9 @@ def train(
             info = policy.update(collector.buffer)
             write_scalar(writer, "0_train", info, updates)
             losses.append(info["loss"])
-        t.set_postfix({"loss_mean": np.mean(losses)})
+        loss_mean = np.mean(losses)
+        t.set_postfix({"loss_mean": loss_mean})
+        return loss_mean
 
     if warmup_size > 0:
         print(f"warming up for {warmup_size} experiences ... ", end="")
@@ -323,7 +328,9 @@ def train(
         with tqdm.tqdm(total=step_per_epoch, desc=f"Epoch #{epoch}", ascii=True) as t:
             while t.n < t.total:
                 do_collect(epoch, t)
-                do_update(epoch, t)
+                loss_mean = do_update(epoch, t)
+                if max_loss is not None and loss_mean > max_loss:
+                    return best_rew
                 t.update(1)
 
             policy.eval()
@@ -334,3 +341,11 @@ def train(
             postepoch_fn(policy, epoch, steps, updates)
 
     return best_rew
+
+
+def watch(policy: Policy, tester: Tester, epochs: int) -> None:
+    policy.eval()
+    with torch.no_grad():
+        for epoch in range(1, 1 + epochs):
+            info = tester.test(policy)
+            pprint(f"Epoch {epoch}: {info}")
