@@ -54,7 +54,7 @@ def create_policy(args) -> Policy:
 
 
 def train_dqn(args) -> None:
-    print(args)
+    print(dict(**args.__dict__))
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)

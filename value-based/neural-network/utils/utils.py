@@ -85,7 +85,7 @@ def get_arg_parser(name: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--epochs",
         type=int,
-        default=100,
+        default=20,
         metavar="N",
         help="number of epochs to train",
     )
