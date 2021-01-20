@@ -1,6 +1,6 @@
 import time
 from pprint import pprint
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import gym
 import numpy as np
@@ -169,11 +169,7 @@ class Collector:
 
         return {
             "buffer_size": len(self.buffer),
-            "step_per_s": steps / cost_t,
-            # "rew_mean": np.mean(rews),
-            # "rew_std": np.std(rews),
-            # "rew_min": np.min(rews),
-            # "rew_max": np.max(rews),
+            "step/s": steps / cost_t,
         }
 
 
@@ -226,8 +222,8 @@ class Tester:
             "step_std": np.std(episode_steps),
             "step_min": np.min(episode_steps),
             "step_max": np.max(episode_steps),
-            "step_per_s": np.sum(episode_steps) / cost_t,
-            "ms_per_episode": 1000.0 * cost_t / self.episodes,
+            "step/s": np.sum(episode_steps) / cost_t,
+            "ms/episode": 1000.0 * cost_t / self.episodes,
         }
 
 
@@ -236,7 +232,10 @@ def write_scalar(writer: SummaryWriter, prefix: str, info: dict, steps: int) -> 
         if k.startswith("dist/"):
             writer.add_histogram(k[5:], v, steps)
         else:
-            writer.add_scalar(f"{prefix}/{k}", v, steps)
+            if k == "loss":
+                writer.add_scalar(k, v, steps)
+            else:
+                writer.add_scalar(f"{prefix}/{k}", v, steps)
 
 
 def train(
@@ -252,93 +251,96 @@ def train(
     batch_size: int,
     *,
     max_loss: Optional[float] = None,
-    preepoch_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
-    precollect_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
-    preupdate_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
-    pretest_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
-    save_fn: Optional[Callable[[Policy, int, float, float], bool]] = None,
-    postepoch_fn: Optional[Callable[[Policy, int, int, int], None]] = None,
+    precollect_fn: Optional[Callable[[int, int, int], None]] = None,
+    preupdate_fn: Optional[Callable[[int, int, int], None]] = None,
+    pretest_fn: Optional[Callable[[int, int, int], None]] = None,
+    save_fn: Optional[Callable[[int, float, float], bool]] = None,
 ) -> float:
     steps = 0
     updates = 0
-    last_rew, best_rew = -np.inf, -np.inf
-
-    def do_test(epoch: int) -> dict:
-        if pretest_fn:
-            pretest_fn(policy, epoch, steps, updates)
-
-        with torch.no_grad():
-            info = tester.test(policy)
-        write_scalar(writer, "1_test", info, steps)
-        return info["rew_mean"]
+    best_rew, last_rew = -np.inf, -np.inf
 
     def do_save(epoch: int) -> bool:
         nonlocal best_rew
 
         running = True
         if save_fn:
-            running = save_fn(policy, epoch, best_rew, last_rew)
+            running = save_fn(epoch, best_rew, last_rew)
         best_rew = max(best_rew, last_rew)
+
         return running
 
-    def do_collect(epoch: int, t: tqdm.tqdm) -> None:
+    def do_collect(epoch: int) -> float:
         nonlocal steps
 
         if precollect_fn:
-            precollect_fn(policy, epoch, steps, updates)
+            precollect_fn(epoch, steps, updates)
 
         with torch.no_grad():
             info = collector.collect(policy, collect_per_step)
-
         steps += collect_per_step
-        write_scalar(writer, "0_train", info, steps)
-        t.set_postfix({"step_per_s": info["step_per_s"]})
+        write_scalar(writer, "train", info, steps)
 
-    def do_update(epoch: int, t: tqdm.tqdm) -> None:
+        return info["step/s"]
+
+    def do_update(epoch: int) -> float:
         nonlocal updates
 
         if preupdate_fn:
-            preupdate_fn(policy, epoch, steps, updates)
+            preupdate_fn(epoch, steps, updates)
 
         losses = []
         for _ in range(update_per_step):
             updates += 1
             info = policy.update(collector.buffer)
-            write_scalar(writer, "0_train", info, updates)
+            write_scalar(writer, "train", info, updates)
             losses.append(info["loss"])
-        loss_mean = np.mean(losses)
-        t.set_postfix({"loss_mean": loss_mean})
-        return loss_mean
+
+        return np.mean(losses)
+
+    def do_test(epoch: int) -> Tuple[float, float]:
+        if pretest_fn:
+            pretest_fn(epoch, steps, updates)
+
+        with torch.no_grad():
+            info = tester.test(policy)
+        write_scalar(writer, "test", info, steps)
+
+        return info["rew_mean"], info["rew_std"]
 
     if warmup_size > 0:
-        print(f"warming up for {warmup_size} experiences ... ", end="")
+        # print(f"warming up for {warmup_size} experiences ... ", end="")
         with torch.no_grad():
             collector.collect(policy, warmup_size)
-        print("done")
+        # print("done")
 
     for epoch in range(1, 1 + epochs):
         policy.train()
 
-        if preepoch_fn:
-            preepoch_fn(policy, epoch, steps, updates)
-
         if not do_save(epoch):
             break
 
-        with tqdm.tqdm(total=step_per_epoch, desc=f"Epoch #{epoch}", ascii=True) as t:
+        with tqdm.tqdm(
+            total=step_per_epoch, desc=f"Epoch #{epoch}", ascii=True, dynamic_ncols=True
+        ) as t:
             while t.n < t.total:
-                do_collect(epoch, t)
-                loss_mean = do_update(epoch, t)
+                step_per_s = do_collect(epoch)
+                loss_mean = do_update(epoch)
+
+                t.update(1)
+                info = {
+                    "step/s": f"{step_per_s:.2f}",
+                    "loss": f"{loss_mean:.6f}",
+                }
+                t.set_postfix(**info)
+
                 if max_loss is not None and loss_mean > max_loss:
                     return best_rew
-                t.update(1)
 
-            policy.eval()
-            last_rew = do_test(epoch)
-            t.set_postfix({"rew_mean": last_rew})
-
-        if postepoch_fn:
-            postepoch_fn(policy, epoch, steps, updates)
+        policy.eval()
+        rew_mean, rew_std = do_test(epoch)
+        print(f"Epoch #{epoch}: test reward={rew_mean:.3f} ± {rew_std:.3f}")
+        last_rew = rew_mean
 
     return best_rew
 

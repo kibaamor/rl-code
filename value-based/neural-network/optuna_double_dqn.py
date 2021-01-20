@@ -17,7 +17,9 @@ def double_dqn_parser_hook(parser: ArgumentParser, trail: optuna.Trial):
 
 def double_dqn_objective(trail: optuna.Trial) -> float:
     args = get_args(lambda parser: double_dqn_parser_hook(parser, trail))
-    return train_double_dqn(args)
+    reward = train_double_dqn(args)
+    print(trail.params, reward)
+    return reward
 
 
 def optimize_double_dqn(trials: int) -> optuna.Study:

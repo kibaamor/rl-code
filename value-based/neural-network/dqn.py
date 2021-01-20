@@ -2,6 +2,7 @@ import pathlib
 from argparse import ArgumentParser
 from copy import deepcopy
 from os.path import join
+from pprint import pprint
 from typing import Callable, Optional
 
 import numpy as np
@@ -54,7 +55,7 @@ def create_policy(args) -> Policy:
 
 
 def train_dqn(args) -> None:
-    print(dict(**args.__dict__))
+    pprint(args.__dict__)
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -65,20 +66,23 @@ def train_dqn(args) -> None:
     logdir = join(here, args.name)
     writer = SummaryWriter(logdir)
 
-    def precollect(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
+    def precollect(epoch: int, steps: int, updates: int) -> None:
         eps = args.eps_collect * (args.eps_collect_gamma ** epoch)
         policy.eps = eps if eps > args.eps_collect_min else args.eps_collect_min
-        writer.add_scalar("0_train/eps", policy.eps, steps)
+        writer.add_scalar("train/eps", policy.eps, steps)
 
-    def preupdate(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
+    def preupdate(epoch: int, steps: int, updates: int) -> None:
         policy.eps = 0.0
 
-    def pretest(policy: DQNPolicy, epoch: int, steps: int, updates: int) -> None:
+    def pretest(epoch: int, steps: int, updates: int) -> None:
         policy.eps = args.eps_test
 
-    def save(policy: DQNPolicy, epoch: int, best_rew: float, rew: float) -> bool:
+    def save(epoch: int, best_rew: float, rew: float) -> bool:
+        nonlocal policy
+
         if rew <= best_rew:
             return True
+
         policy = deepcopy(policy).to(torch.device("cpu"))
         torch.save(policy.state_dict(), f"{logdir}/dqn_{args.game}_{rew:.2f}.pth")
         if args.max_reward is not None:

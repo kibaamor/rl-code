@@ -8,7 +8,7 @@ from dqn import get_args, train_dqn
 def dqn_parser_hook(name_prefix: str, parser: ArgumentParser, trail: optuna.Trial):
     parser.set_defaults(
         name=name_prefix + "_" + str(uuid.uuid1()),
-        lr=trail.suggest_categorical("lr", [1e-6, 1e-5, 1e-4, 1e-3]),
+        lr=trail.suggest_categorical("lr", [1e-6, 1e-5]),
         activation=trail.suggest_categorical("activation", ["relu", "selu", "ident"]),
         layer_num=trail.suggest_int("layer_num", 1, 5, step=1),
         hidden_size=trail.suggest_categorical("hidden_size", [32, 64, 128, 256, 512]),
@@ -18,7 +18,9 @@ def dqn_parser_hook(name_prefix: str, parser: ArgumentParser, trail: optuna.Tria
 
 def dqn_objective(trail: optuna.Trial) -> float:
     args = get_args(lambda parser: dqn_parser_hook("dqn", parser, trail))
-    return train_dqn(args)
+    reward = train_dqn(args)
+    print(trail.params, reward)
+    return reward
 
 
 def optimize_dqn(trials: int) -> optuna.Study:
@@ -34,8 +36,8 @@ def optimize_dqn(trials: int) -> optuna.Study:
 
 def dump_best_study(study):
     trial = study.best_trial
-    print("  Value: ", trial.value)
-    print("  Params: ")
+    print("  Best Value: ", trial.value)
+    print("  Best Params: ")
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
 
